@@ -2,9 +2,9 @@
 
 > Build agents with a council, verifier kernels, and signed integrations. **Any model. MIT.**
 
-[![npm](https://img.shields.io/npm/v/@vextlabs/theron-agent-sdk?label=npm)](https://www.npmjs.com/package/@vextlabs/theron-agent-sdk)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org/)
+[![status](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/Vext-Labs-Inc/theron-agent-sdk/releases)
 
 Theron Agent SDK is the open-source agent development kit from [Vext Labs](https://tryvext.com). It ships the three primitives every other framework expects you to build yourself:
 
@@ -21,16 +21,26 @@ To run agents on Vext's managed 15-specialist Council with per-tenant LoRA tunin
 ## Install
 
 ```sh
-npm install @vextlabs/theron-agent-sdk
+# Install directly from GitHub (alpha — current install path)
+npm install github:Vext-Labs-Inc/theron-agent-sdk
+```
+
+```sh
+# Coming with v0.2 (stable API):
+# npm install @vextlabs/theron-agent-sdk
 ```
 
 Requires Node 20+.
+
+> The alpha installs from GitHub directly so we can iterate on the API without semver churn on npm. We'll publish to npm at v0.2 once the surface stabilizes.
 
 ## 5-line agent
 
 ```ts
 import { Agent, Runner } from "@vextlabs/theron-agent-sdk";
-import { openrouterAdapter } from "@vextlabs/theron-agent-sdk/adapters/openrouter";
+// During alpha, the OpenRouter adapter is shipped in examples/. Copy it into
+// your project, or use any OpenAI-compatible adapter you already have.
+import { openrouterAdapter } from "./adapters/openrouter.js";
 
 const agent = new Agent({ name: "helper", instruction: "Answer helpfully." });
 const runner = new Runner({
