@@ -1,0 +1,80 @@
+{
+  "name": "@vextlabs/theron-agent-sdk",
+  "version": "0.1.0-alpha",
+  "description": "The open-source agent SDK with a council of domain specialists, deterministic verifier kernels, and Stoa-signed SaaS integrations. Build any agent against any model. Built by Vext Labs.",
+  "license": "MIT",
+  "homepage": "https://tryvext.com/adk",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Vext-Labs-Inc/theron-agent-sdk"
+  },
+  "keywords": [
+    "agent",
+    "agents",
+    "agent-sdk",
+    "ai-agents",
+    "council",
+    "deliberation",
+    "verifier-kernels",
+    "stoa",
+    "lora",
+    "domain-specialists",
+    "theron",
+    "vext-labs",
+    "open-source",
+    "self-improving",
+    "closed-loop"
+  ],
+  "author": "Vext Labs, Inc.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./agent": "./dist/agent/index.js",
+    "./council": "./dist/council/index.js",
+    "./session": "./dist/session/index.js",
+    "./memory": "./dist/memory/index.js",
+    "./tools": "./dist/tools/index.js",
+    "./verifiers": "./dist/verifiers/index.js",
+    "./runtime": "./dist/runtime/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "examples"
+  ],
+  "scripts": {
+    "build": "tsc -p .",
+    "dev": "tsc -p . --watch",
+    "test": "node --test --import tsx ./src/**/*.test.ts",
+    "example:hello": "tsx examples/01_hello_agent.ts",
+    "example:council": "tsx examples/02_council_15_lines.ts",
+    "example:verifier": "tsx examples/03_verifier_kernel.ts",
+    "example:stoa": "tsx examples/04_stoa_signed_integration.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "peerDependencies": {
+    "openai": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "openai": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
