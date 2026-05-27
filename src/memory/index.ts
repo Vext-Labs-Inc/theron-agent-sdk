@@ -11,7 +11,8 @@ export interface MemoryRecord {
   key: string;
   /** The actual content. */
   value: string;
-  /** Tenant scope (multi-tenant deployments). */
+  /** Tenant scope (multi-tenant deployments). Always filter on this in
+   *  production — there is no implicit isolation. */
   tenant_id?: string;
   /** Optional tags for categorization. */
   tags?: string[];
@@ -41,11 +42,14 @@ export interface MemoryQuery {
  *
  * Built-in implementations:
  *   - InMemoryStore (default; for development)
- *   - For production, plug in pgvector, R2, SQLite, etc. via the Memory.from() factory.
+ *   - For production, plug in pgvector, R2, SQLite, etc. by extending Memory.
  *
  * Minimal usage:
  *   const mem = new InMemoryStore();
- *   await mem.set({ key: "user_name", value: "Annalea", created_at: Date.now(), last_accessed_at: Date.now(), id: "1" });
+ *   await mem.set({
+ *     key: "user_name", value: "Annalea",
+ *     created_at: Date.now(), last_accessed_at: Date.now(),
+ *   });
  *   const records = await mem.query({ key: "user_name" });
  */
 export abstract class Memory {
@@ -58,6 +62,10 @@ export abstract class Memory {
 /**
  * InMemoryStore — default Memory implementation. Volatile; for development.
  * Production should swap in a persistent backend.
+ *
+ * NOTE: this implementation does NOT enforce tenant isolation at the storage
+ * layer — `query({ tenant_id })` filters but does not partition. Production
+ * backends should partition by tenant at the storage layer.
  */
 export class InMemoryStore extends Memory {
   private records: Map<string, MemoryRecord> = new Map();
@@ -94,7 +102,8 @@ export class InMemoryStore extends Memory {
       results = results.filter((r) => r.tags?.some((t) => q.tags!.includes(t)));
     }
     if (q.semantic_query !== undefined) {
-      // Stub: in production this is pgvector or similar. Here we do dumb substring.
+      // Stub: in production this is pgvector or similar. Here it's a
+      // case-insensitive substring match — useful only for tests + demos.
       const ql = q.semantic_query.toLowerCase();
       results = results.filter((r) => r.value.toLowerCase().includes(ql));
     }

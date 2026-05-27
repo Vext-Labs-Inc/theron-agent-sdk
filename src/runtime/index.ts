@@ -26,14 +26,10 @@ export type RunnerEvent =
 /**
  * Model adapter — the function the Runner calls to talk to an LLM.
  *
- * Implement once per provider:
- *   - OpenAI: openaiAdapter (free, OSS)
- *   - OpenRouter: openrouterAdapter (free, OSS — 200+ models)
- *   - Anthropic Claude: claudeAdapter (free, OSS)
- *   - Vext-hosted Theron with trained Council: theronAdapter (requires Vext API key)
- *
- * Three of these ship in the SDK (open). theronAdapter is open-source
- * but requires a Vext API key to actually return useful output.
+ * Implement once per provider. Three reference adapters ship in
+ * `examples/adapters/`: OpenRouter, OpenAI, Anthropic. Production users write
+ * their own adapter for their preferred endpoint (Vext-hosted Theron, AWS
+ * Bedrock, Cerebras, Groq, your own OSS endpoint).
  */
 export interface ModelAdapter {
   name: string;
@@ -87,6 +83,8 @@ export class Runner {
   private listeners: Array<(event: RunnerEvent) => void> = [];
 
   constructor(config: RunnerConfig) {
+    if (!config.model) throw new Error("Runner requires a `model` adapter.");
+    if (!config.default_model) throw new Error("Runner requires a `default_model` identifier.");
     this.model = config.model;
     this.default_model = config.default_model;
     this.memory = config.memory;
@@ -145,6 +143,9 @@ export class Runner {
       tokensOut += response.tokens.output;
 
       if (response.tool_calls && response.tool_calls.length > 0) {
+        // Push the assistant turn that requested the tool calls once,
+        // then push one tool-result message per call.
+        messages.push({ role: "assistant", content: response.content });
         for (const call of response.tool_calls) {
           const tool = agent.tools.find((t) => t.schema.name === call.name);
           if (!tool) {
@@ -153,6 +154,7 @@ export class Runner {
               agent: agent.name,
               message: `Model called unknown tool: ${call.name}`,
             });
+            messages.push({ role: "tool", content: `error: unknown tool ${call.name}` });
             continue;
           }
           this.emit({ type: "tool_call_start", agent: agent.name, tool: call.name, input: call.input });
@@ -162,15 +164,11 @@ export class Runner {
             const ms = Date.now() - t0;
             this.emit({ type: "tool_call_done", agent: agent.name, tool: call.name, output, ms });
             toolCalls.push({ name: call.name, input: call.input, output });
-            messages.push({ role: "assistant", content: response.content });
             messages.push({ role: "tool", content: JSON.stringify(output) });
           } catch (err) {
-            this.emit({
-              type: "error",
-              agent: agent.name,
-              message: `Tool ${call.name} threw: ${err instanceof Error ? err.message : String(err)}`,
-            });
-            messages.push({ role: "tool", content: `error: ${err}` });
+            const msg = err instanceof Error ? err.message : String(err);
+            this.emit({ type: "error", agent: agent.name, message: `Tool ${call.name} threw: ${msg}` });
+            messages.push({ role: "tool", content: `error: ${msg}` });
           }
         }
         continue; // model gets to see tool results before producing final answer
@@ -183,10 +181,22 @@ export class Runner {
 
     this.emit({ type: "agent_output", agent: agent.name, output: finalOutput });
 
-    // Run verifiers (if any) — the SDK ships built-in verifier kernels; this
-    // is a stub that says "verifier slug X requested" — production code wires
-    // VerifierKernels from ../verifiers/index.ts.
-    const verifier_results: AgentResult["verifier_results"] = [];
+    // Run verifier kernels registered on the agent. Failures are reported but
+    // do not throw — callers (or a Council) decide policy.
+    const verifier_results: VerifierResult[] = [];
+    for (const v of agent.verifiers) {
+      try {
+        const result = await v.check(finalOutput);
+        verifier_results.push(result);
+        this.emit({ type: "verifier_run", agent: agent.name, kernel: v.name, result });
+      } catch (err) {
+        this.emit({
+          type: "error",
+          agent: agent.name,
+          message: `Verifier ${v.name} threw: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    }
 
     const latency_ms = Date.now() - startedAt;
     return {
@@ -204,23 +214,56 @@ export class Runner {
    * Run a Council on a query.
    *
    * Fan out to all specialists in parallel (with timeout), gather outputs,
-   * reconcile via the Council's reconciler, return synthesized output.
+   * run council-level verifier kernels on each, and reconcile.
    */
   async runCouncil(council: Council, query: string): Promise<CouncilOutput> {
     const startedAt = Date.now();
     this.emit({ type: "council_start", council: council.name, query });
 
-    // Fan out
+    const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> =>
+      Promise.race([
+        p,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+      ]);
+
     const specialistResults = await Promise.all(
       council.specialists.map(async (spec) => {
         try {
-          const result = await this.run(spec, query);
-          // Convert AgentResult → CouncilSpecialistOutput
+          const result = await withTimeout(this.run(spec, query), council.specialist_timeout_ms);
+          if (result === null) {
+            this.emit({
+              type: "error",
+              agent: spec.name,
+              message: `Specialist timed out after ${council.specialist_timeout_ms}ms`,
+            });
+            return null;
+          }
+          // Run council-level verifiers on each specialist output.
+          const councilVerifierResults: VerifierResult[] = [];
+          for (const v of council.verifiers) {
+            try {
+              const r = await v.check(result.output);
+              councilVerifierResults.push(r);
+              this.emit({ type: "verifier_run", agent: spec.name, kernel: v.name, result: r });
+            } catch (err) {
+              this.emit({
+                type: "error",
+                agent: spec.name,
+                message: `Council verifier ${v.name} threw: ${err instanceof Error ? err.message : String(err)}`,
+              });
+            }
+          }
           const out: CouncilSpecialistOutput = {
             specialist: spec.name,
             output: result.output,
-            claims: [], // TODO: claim extraction; stub for v0.1
-            verifier_results: (result.verifier_results ?? []) as VerifierResult[],
+            claims: [], // claim extraction is the reconciler's job
+            // AgentResult.verifier_results widens issues to unknown[]; at the
+            // runtime layer we know every entry came from a Verifier.check()
+            // call (which produces VerifierIssue[]), so the cast is sound.
+            verifier_results: [
+              ...(result.verifier_results as VerifierResult[]),
+              ...councilVerifierResults,
+            ],
             cost_usd: result.cost_usd,
             latency_ms: result.latency_ms,
           };

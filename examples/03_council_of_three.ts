@@ -4,20 +4,21 @@
  * Three generic agents (Engineer, Security, Product) deliberate on a question.
  * Outputs are checked by verifier kernels before reconciliation.
  *
- * This is the 15-line Council pattern — the Hive moat in a single example.
+ * This is the 15-line Council pattern — the Theron Agent SDK moat in a single
+ * example.
  *
  * Run:
- *   OPENROUTER_API_KEY=sk-... tsx examples/03_council_of_three.ts
+ *   OPENROUTER_API_KEY=sk-or-... npx tsx examples/03_council_of_three.ts
  *
  * What this demonstrates:
- *   - Council primitive (the flagship Hive SDK feature)
+ *   - Council primitive (the flagship Theron Agent SDK feature)
  *   - Multi-specialist deliberation
  *   - Verifier kernels applied across the council
  *   - Reconciler (deterministic claim-merge by default)
  */
 
 import { Agent, Council, Runner, VerifierKernels } from "../src/index.js";
-import { openrouterAdapter } from "../examples/_adapters/openrouter.js";
+import { openrouterAdapter } from "./adapters/openrouter.js";
 
 const engineer = new Agent({
   name: "engineer",
@@ -48,8 +49,14 @@ const council = new Council({
 });
 
 async function main() {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    console.error("Set OPENROUTER_API_KEY (https://openrouter.ai/keys) and rerun.");
+    process.exit(1);
+  }
+
   const runner = new Runner({
-    model: openrouterAdapter({ apiKey: process.env.OPENROUTER_API_KEY! }),
+    model: openrouterAdapter({ apiKey }),
     default_model: "openai/gpt-4o-mini",
   });
 
@@ -78,4 +85,7 @@ async function main() {
   );
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

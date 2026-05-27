@@ -1,7 +1,8 @@
 // Agent — the smallest unit. A model + an instruction + tools + optional
-// sub-agents. The 5-line agent pattern.
+// sub-agents + optional verifier kernels. The 5-line agent pattern.
 
 import type { Tool, ToolSchema } from "../tools/index.js";
+import type { Verifier } from "../verifiers/index.js";
 
 export interface AgentInstruction {
   /** System prompt or persona instruction. */
@@ -23,8 +24,10 @@ export interface AgentConfig {
   tools?: Tool[];
   /** Sub-agents the agent may delegate to. */
   sub_agents?: Agent[];
-  /** Optional verifier kernel slugs that must pass on every turn. */
-  verifiers?: string[];
+  /** Verifier kernels that run against the final output. Failures are
+   *  reported in AgentResult.verifier_results but do not throw — callers
+   *  decide how to react. Use Council if you want gating + reconciliation. */
+  verifiers?: Verifier[];
   /** Optional max-turn cap. Defaults to runner default. */
   max_turns?: number;
 }
@@ -33,7 +36,7 @@ export interface AgentResult {
   agent: string;
   output: string;
   tool_calls: Array<{ name: string; input: unknown; output: unknown }>;
-  verifier_results?: Array<{ kernel: string; pass: boolean; issues: unknown[]; ms: number }>;
+  verifier_results: Array<{ kernel: string; pass: boolean; issues: unknown[]; ms: number }>;
   tokens_used: { input: number; output: number };
   cost_usd: number;
   latency_ms: number;
@@ -50,7 +53,7 @@ export interface AgentResult {
  *     name: "researcher",
  *     instruction: "Answer with citations.",
  *     tools: [webSearch, fetchUrl],
- *     verifiers: ["citation_presence"],
+ *     verifiers: [VerifierKernels.citationPresence],
  *   });
  */
 export class Agent {
@@ -59,10 +62,12 @@ export class Agent {
   public readonly instruction: AgentInstruction;
   public readonly tools: Tool[];
   public readonly sub_agents: Agent[];
-  public readonly verifiers: string[];
+  public readonly verifiers: Verifier[];
   public readonly max_turns: number;
 
   constructor(config: AgentConfig) {
+    if (!config.name) throw new Error("Agent requires a `name`.");
+    if (!config.instruction) throw new Error(`Agent "${config.name}" requires an \`instruction\`.`);
     this.name = config.name;
     this.model = config.model;
     this.instruction =

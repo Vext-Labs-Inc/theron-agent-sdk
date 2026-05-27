@@ -1,12 +1,15 @@
 {
   "name": "@vextlabs/theron-agent-sdk",
-  "version": "0.1.0-alpha",
-  "description": "The open-source agent SDK with a council of domain specialists, deterministic verifier kernels, and Stoa-signed SaaS integrations. Build any agent against any model. Built by Vext Labs.",
+  "version": "0.1.0",
+  "description": "Open-source agent SDK with a Council of specialists, deterministic verifier kernels, and Stoa-signed integrations. Build any agent against any model. From Vext Labs.",
   "license": "MIT",
   "homepage": "https://tryvext.com/adk",
   "repository": {
     "type": "git",
     "url": "https://github.com/Vext-Labs-Inc/theron-agent-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/Vext-Labs-Inc/theron-agent-sdk/issues"
   },
   "keywords": [
     "agent",
@@ -27,32 +30,82 @@
   ],
   "author": "Vext Labs, Inc.",
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./agent": "./dist/agent/index.js",
-    "./council": "./dist/council/index.js",
-    "./session": "./dist/session/index.js",
-    "./memory": "./dist/memory/index.js",
-    "./tools": "./dist/tools/index.js",
-    "./verifiers": "./dist/verifiers/index.js",
-    "./runtime": "./dist/runtime/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./agent": {
+      "types": "./dist/agent/index.d.ts",
+      "import": "./dist/agent/index.js",
+      "require": "./dist/agent/index.cjs"
+    },
+    "./council": {
+      "types": "./dist/council/index.d.ts",
+      "import": "./dist/council/index.js",
+      "require": "./dist/council/index.cjs"
+    },
+    "./session": {
+      "types": "./dist/session/index.d.ts",
+      "import": "./dist/session/index.js",
+      "require": "./dist/session/index.cjs"
+    },
+    "./memory": {
+      "types": "./dist/memory/index.d.ts",
+      "import": "./dist/memory/index.js",
+      "require": "./dist/memory/index.cjs"
+    },
+    "./tools": {
+      "types": "./dist/tools/index.d.ts",
+      "import": "./dist/tools/index.js",
+      "require": "./dist/tools/index.cjs"
+    },
+    "./verifiers": {
+      "types": "./dist/verifiers/index.d.ts",
+      "import": "./dist/verifiers/index.js",
+      "require": "./dist/verifiers/index.cjs"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "import": "./dist/runtime/index.js",
+      "require": "./dist/runtime/index.cjs"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.js",
+      "require": "./dist/mcp/index.cjs"
+    },
+    "./receipts": {
+      "types": "./dist/receipts/index.d.ts",
+      "import": "./dist/receipts/index.js",
+      "require": "./dist/receipts/index.cjs"
+    }
   },
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "examples"
   ],
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc -p .",
-    "dev": "tsc -p . --watch",
-    "test": "node --test --import tsx ./src/**/*.test.ts",
-    "example:hello": "tsx examples/01_hello_agent.ts",
-    "example:council": "tsx examples/02_council_15_lines.ts",
-    "example:verifier": "tsx examples/03_verifier_kernel.ts",
-    "example:stoa": "tsx examples/04_stoa_signed_integration.ts",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "docs": "typedoc",
+    "example:basic": "tsx examples/basic-agent.ts",
+    "example:council": "tsx examples/council-deliberation.ts",
+    "example:verifier": "tsx examples/verifier-kernel.ts",
+    "example:cyber": "tsx examples/cyber-recon-bot.ts",
+    "example:meeting": "tsx examples/meeting-prep-bot.ts",
+    "example:support": "tsx examples/support-triage-bot.ts",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
@@ -68,8 +121,12 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^4.1.6",
+    "tsup": "^8.5.1",
     "tsx": "^4.0.0",
-    "typescript": "^5.3.0"
+    "typedoc": "^0.28.19",
+    "typescript": "^5.3.0",
+    "vitest": "^4.1.6"
   },
   "engines": {
     "node": ">=20.0.0"

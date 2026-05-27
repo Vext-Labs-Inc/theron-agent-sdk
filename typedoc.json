@@ -1,0 +1,25 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts",
+    "src/agent/index.ts",
+    "src/council/index.ts",
+    "src/session/index.ts",
+    "src/memory/index.ts",
+    "src/tools/index.ts",
+    "src/verifiers/index.ts",
+    "src/runtime/index.ts"
+  ],
+  "out": "docs",
+  "name": "Theron Agent SDK",
+  "readme": "README.md",
+  "navigationLinks": {
+    "Homepage": "https://tryvext.com/adk",
+    "GitHub": "https://github.com/Vext-Labs-Inc/theron-agent-sdk"
+  },
+  "githubPages": false,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "skipErrorChecking": false,
+  "hideGenerator": true
+}

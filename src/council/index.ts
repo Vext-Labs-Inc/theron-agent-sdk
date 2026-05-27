@@ -1,10 +1,10 @@
 // Council — N specialists deliberate, verifier kernels check, reconciler
 // produces the final answer.
 //
-// This is Hive's flagship primitive. The architecture nobody else ships
-// as a first-class SDK abstraction.
+// This is Theron Agent SDK's flagship primitive. The architecture nobody
+// else ships as a first-class SDK abstraction.
 
-import type { Agent, AgentResult } from "../agent/index.js";
+import type { Agent } from "../agent/index.js";
 import type { Verifier, VerifierResult } from "../verifiers/index.js";
 
 /** Output of a single specialist's turn before reconciliation. */
@@ -69,13 +69,13 @@ export interface CouncilConfig {
  *     name: "engineering-review",
  *     specialists: [cyberAgent, codeAgent, archAgent],
  *   });
- *   const result = await c.deliberate("Review this PR for security risks");
+ *   const result = await runner.runCouncil(c, "Review this PR for security risks");
  *
  * With verifier kernels:
  *   const c = new Council({
  *     name: "math-proof",
  *     specialists: [mathAgent, reasoningAgent, verifierAgent],
- *     verifiers: [VerifierKernels.arithmetic, VerifierKernels.citation],
+ *     verifiers: [VerifierKernels.arithmetic, VerifierKernels.citationPresence],
  *   });
  */
 export class Council {
@@ -86,6 +86,10 @@ export class Council {
   public readonly specialist_timeout_ms: number;
 
   constructor(config: CouncilConfig) {
+    if (!config.name) throw new Error("Council requires a `name`.");
+    if (!config.specialists || config.specialists.length === 0) {
+      throw new Error(`Council "${config.name}" requires at least one specialist.`);
+    }
     this.name = config.name;
     this.specialists = config.specialists;
     this.verifiers = config.verifiers ?? [];
@@ -94,21 +98,16 @@ export class Council {
   }
 
   /**
-   * Run the council on a query.
-   *
-   * Fans out to all specialists in parallel, runs verifier kernels on each
-   * output, and reconciles the surviving outputs.
-   *
-   * Note: this stub is the public surface. The actual fan-out + reconciliation
-   * runs through the Runner, which the user constructs with their own model
-   * adapter. See examples/02_council_15_lines.ts for the wiring.
+   * Convenience entry point — pointed at the Runner you've already constructed.
+   * Most users will call `runner.runCouncil(council, query)` directly; this
+   * exists for symmetry with `agent.run`-style ergonomics in user code.
    */
   async deliberate(_query: string): Promise<CouncilOutput> {
     throw new Error(
       "Council.deliberate() requires a Runner. Use:\n" +
         "  const runner = new Runner({ ... });\n" +
         "  const result = await runner.runCouncil(council, query);\n" +
-        "See: https://github.com/Vext-Labs-Inc/hive-sdk/blob/main/examples/02_council_15_lines.ts",
+        "See: https://github.com/Vext-Labs-Inc/theron-agent-sdk/blob/main/examples/03_council_of_three.ts",
     );
   }
 }
@@ -118,11 +117,16 @@ export class Council {
  *
  * Strategy:
  *   1. Collect claims from all specialists.
- *   2. For each claim: if every specialist agrees, ratify.
- *   3. If specialists disagree on a claim: surface as disagreement.
- *   4. Synthesize a final answer that includes ratified claims + flags disagreements.
+ *   2. If every specialist agrees, ratify.
+ *   3. Strict majority (> N/2) ratifies the claim silently.
+ *   4. Minority dissent (< majority) is surfaced as a disagreement.
+ *   5. Final answer = ratified claims joined; surface disagreements alongside.
  *
  * No LLM call. Fast (< 5ms). Deterministic. Auditable.
+ *
+ * Note: "ratified" here means "the council aligned" — either unanimous or
+ * strict-majority. "split" means at least one claim had minority dissent.
+ * "refuted" means nothing crossed the majority threshold.
  */
 const deterministicClaimMerge: Reconciler = async (specialists) => {
   if (specialists.length === 0) {
@@ -131,7 +135,8 @@ const deterministicClaimMerge: Reconciler = async (specialists) => {
   if (specialists.length === 1) {
     return { answer: specialists[0].output, consensus: "ratified" };
   }
-  // Simple version: claim-text-equal grouping. Production would use semantic clustering.
+  // Claim-text-equal grouping. Production callers should plug in a semantic
+  // clustering reconciler for paraphrase-tolerant matching.
   const claimMap = new Map<string, string[]>();
   for (const s of specialists) {
     for (const c of s.claims) {
@@ -141,14 +146,16 @@ const deterministicClaimMerge: Reconciler = async (specialists) => {
     }
   }
   const ratified: string[] = [];
-  const disagreements: CouncilOutput["disagreements"] = [];
+  const disagreements: NonNullable<CouncilOutput["disagreements"]> = [];
+  // Strict majority: more than half. For 3 specialists, that's ≥ 2.
+  const majorityThreshold = specialists.length / 2;
   for (const [claim, voters] of claimMap.entries()) {
     if (voters.length === specialists.length) {
       ratified.push(claim);
-    } else if (voters.length >= specialists.length / 2) {
+    } else if (voters.length > majorityThreshold) {
       ratified.push(claim);
     } else {
-      disagreements!.push({
+      disagreements.push({
         claim,
         specialists_for: voters,
         specialists_against: specialists
@@ -159,6 +166,6 @@ const deterministicClaimMerge: Reconciler = async (specialists) => {
   }
   const answer = ratified.join(" ") || specialists[0].output;
   const consensus: CouncilOutput["consensus"] =
-    disagreements!.length > 0 ? "split" : ratified.length > 0 ? "ratified" : "refuted";
-  return { answer, consensus, disagreements: disagreements!.length > 0 ? disagreements : undefined };
+    disagreements.length > 0 ? "split" : ratified.length > 0 ? "ratified" : "refuted";
+  return { answer, consensus, disagreements: disagreements.length > 0 ? disagreements : undefined };
 };

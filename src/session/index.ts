@@ -21,6 +21,13 @@ export interface SessionConfig {
   initial_state?: Record<string, unknown>;
 }
 
+export type SessionJSON = {
+  id: string;
+  tenant_id?: string;
+  state: Record<string, unknown>;
+  events: SessionEvent[];
+};
+
 /**
  * Session — append-only event log + scoped state.
  *
@@ -30,7 +37,7 @@ export interface SessionConfig {
  *   sess.state.set("user_name", "Annalea");
  *
  * Persistence: by default, sessions are in-memory. Plug in a persistence
- * adapter (Postgres, R2, SQLite) via Session.persistTo().
+ * adapter (Postgres, R2, SQLite) via the toJSON / fromJSON pair.
  */
 export class Session {
   public readonly id: string;
@@ -62,7 +69,7 @@ export class Session {
   }
 
   /** Serialize the session for persistence. */
-  toJSON(): { id: string; tenant_id?: string; state: Record<string, unknown>; events: SessionEvent[] } {
+  toJSON(): SessionJSON {
     return {
       id: this.id,
       tenant_id: this.tenant_id,
@@ -72,7 +79,7 @@ export class Session {
   }
 
   /** Restore a session from its serialized form. */
-  static fromJSON(data: ReturnType<Session["toJSON"]>): Session {
+  static fromJSON(data: SessionJSON): Session {
     const sess = new Session({ id: data.id, tenant_id: data.tenant_id, initial_state: data.state });
     for (const e of data.events) sess.events.push(e);
     return sess;
@@ -80,7 +87,7 @@ export class Session {
 }
 
 function cryptoRandomId(): string {
-  // Browser + Node 20+ both support crypto.randomUUID
+  // Browser + Node 20+ both support crypto.randomUUID.
   if (typeof globalThis.crypto?.randomUUID === "function") {
     return globalThis.crypto.randomUUID();
   }

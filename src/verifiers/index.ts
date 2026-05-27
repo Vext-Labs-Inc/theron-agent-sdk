@@ -46,7 +46,7 @@ export interface Verifier {
  *       const issues = [...output.matchAll(/—/g)].map((m) => ({
  *         kernel: "em_dash_check",
  *         severity: "error" as const,
- *         message: "Em-dash detected (— is reserved)",
+ *         message: "Em-dash detected",
  *         span: { start: m.index!, end: m.index! + 1 },
  *       }));
  *       return { pass: issues.length === 0, issues };
@@ -69,14 +69,8 @@ export function defineVerifier(opts: {
   };
 }
 
-// ─── Built-in verifier kernels ──────────────────────────────────────────────
+// Built-in verifier kernels — composed or extended via defineVerifier.
 
-/**
- * Built-in verifier kernels.
- *
- * These are the kernels we ship by default. Users compose them or write their
- * own via defineVerifier.
- */
 export const VerifierKernels = {
   /** Block em-dashes (common AI tell). */
   emDash: defineVerifier({
@@ -87,27 +81,31 @@ export const VerifierKernels = {
       const issues = matches.map((m) => ({
         kernel: "em_dash_check",
         severity: "error" as const,
-        message: "Em-dash detected (— is reserved)",
+        message: "Em-dash detected",
         span: { start: m.index!, end: m.index! + 1 },
       }));
       return { pass: issues.length === 0, issues };
     },
   }),
 
-  /** Block AI-ism words (delve, tapestry, leverage, etc.). */
+  /** Block common AI-ism words. Word-boundary aware to avoid false positives
+   *  (e.g., "leverage" matches but not "delivered"). */
   aiIsm: defineVerifier({
     name: "ai_ism_check",
     description: "Block common AI-ism words.",
     check: async (output: string) => {
       const aiisms = ["delve", "tapestry", "leverage", "robust", "seamless", "navigate", "embark"];
-      const lower = output.toLowerCase();
-      const issues = aiisms
-        .filter((w) => lower.includes(w))
-        .map((w) => ({
-          kernel: "ai_ism_check" as const,
-          severity: "warning" as const,
-          message: `AI-ism detected: "${w}"`,
-        }));
+      const issues: VerifierIssue[] = [];
+      for (const w of aiisms) {
+        const re = new RegExp(`\\b${w}\\b`, "gi");
+        if (re.test(output)) {
+          issues.push({
+            kernel: "ai_ism_check",
+            severity: "warning",
+            message: `AI-ism detected: "${w}"`,
+          });
+        }
+      }
       return { pass: issues.length === 0, issues };
     },
   }),
@@ -117,7 +115,7 @@ export const VerifierKernels = {
     name: "arithmetic_recheck",
     description: "Re-evaluate arithmetic in 'X op Y = Z' form.",
     check: async (output: string) => {
-      const pattern = /(-?\d+(?:\.\d+)?)\s*([+\-*\/])\s*(-?\d+(?:\.\d+)?)\s*=\s*(-?\d+(?:\.\d+)?)/g;
+      const pattern = /(-?\d+(?:\.\d+)?)\s*([+\-*/])\s*(-?\d+(?:\.\d+)?)\s*=\s*(-?\d+(?:\.\d+)?)/g;
       const issues: VerifierIssue[] = [];
       for (const m of output.matchAll(pattern)) {
         const a = parseFloat(m[1]);
@@ -125,12 +123,16 @@ export const VerifierKernels = {
         const b = parseFloat(m[3]);
         const claimed = parseFloat(m[4]);
         const actual =
-          op === "+" ? a + b : op === "-" ? a - b : op === "*" ? a * b : op === "/" ? a / b : NaN;
-        if (Math.abs(actual - claimed) > 1e-6) {
+          op === "+" ? a + b
+          : op === "-" ? a - b
+          : op === "*" ? a * b
+          : op === "/" ? (b === 0 ? NaN : a / b)
+          : NaN;
+        if (!Number.isFinite(actual) || Math.abs(actual - claimed) > 1e-6) {
           issues.push({
             kernel: "arithmetic_recheck",
             severity: "error",
-            message: `Claimed ${a} ${op} ${b} = ${claimed}, actual is ${actual}`,
+            message: `Claimed ${a} ${op} ${b} = ${claimed}; actual ${Number.isFinite(actual) ? actual : "undefined"}`,
           });
         }
       }
@@ -145,13 +147,13 @@ export const VerifierKernels = {
     check: async (output: string) => {
       const patterns = [/\[\d+\]/, /\([A-Z][a-z]+(?: et al\.?)? \d{4}\)/, /https?:\/\//];
       const found = patterns.some((p) => p.test(output));
-      const issues = found
+      const issues: VerifierIssue[] = found
         ? []
         : [
             {
-              kernel: "citation_presence" as const,
-              severity: "error" as const,
-              message: "Output contains no citations (required for research/legal/academic profiles)",
+              kernel: "citation_presence",
+              severity: "error",
+              message: "No citation found. Expected one of: [N], (Author YEAR), or a URL.",
             },
           ];
       return { pass: found, issues };

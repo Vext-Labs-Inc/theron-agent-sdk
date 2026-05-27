@@ -5,7 +5,7 @@
  * by the citation_presence verifier kernel.
  *
  * Run:
- *   OPENROUTER_API_KEY=sk-... tsx examples/02_research_assistant.ts
+ *   OPENROUTER_API_KEY=sk-or-... npx tsx examples/02_research_assistant.ts
  *
  * What this demonstrates:
  *   - Verifier kernel composition (citation_presence)
@@ -14,7 +14,7 @@
  */
 
 import { Agent, Runner, defineTool, zod as z, VerifierKernels } from "../src/index.js";
-import { openrouterAdapter } from "../examples/_adapters/openrouter.js";
+import { openrouterAdapter } from "./adapters/openrouter.js";
 
 const webSearch = defineTool({
   name: "web_search",
@@ -47,16 +47,21 @@ const researcher = new Agent({
 with citations. Every factual claim must reference a source from web_search.
 Format citations inline as [N] with a numbered references list at the end.`,
   tools: [webSearch],
-  verifiers: ["citation_presence"],
+  verifiers: [VerifierKernels.citationPresence],
 });
 
 async function main() {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    console.error("Set OPENROUTER_API_KEY (https://openrouter.ai/keys) and rerun.");
+    process.exit(1);
+  }
+
   const runner = new Runner({
-    model: openrouterAdapter({ apiKey: process.env.OPENROUTER_API_KEY! }),
+    model: openrouterAdapter({ apiKey }),
     default_model: "openai/gpt-4o-mini",
   });
 
-  // Run the agent
   const result = await runner.run(
     researcher,
     "Did the Chinchilla paper overturn the 2020 scaling laws? Cite your sources.",
@@ -65,13 +70,16 @@ async function main() {
   console.log("\n=== Answer ===");
   console.log(result.output);
 
-  // Apply the citation_presence verifier to the output
-  const verifierResult = await VerifierKernels.citationPresence.check(result.output);
-  console.log(`\n=== Verifier: citation_presence ===`);
-  console.log(`Pass: ${verifierResult.pass}`);
-  if (!verifierResult.pass) {
-    console.log("Issues:", verifierResult.issues);
+  // result.verifier_results already includes the citation_presence outcome
+  // (the Runner ran every verifier on the agent). This is just for display.
+  for (const v of result.verifier_results) {
+    console.log(`\n=== Verifier: ${v.kernel} ===`);
+    console.log(`Pass: ${v.pass}`);
+    if (!v.pass) console.log("Issues:", v.issues);
   }
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

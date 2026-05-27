@@ -1,55 +1,29 @@
 # Theron Agent SDK
 
-> Build agents with a council, verifier kernels, and signed integrations. **Any model. MIT.**
+> Build agents that work, with receipts you can verify. Any model. MIT.
 
+[![npm](https://img.shields.io/npm/v/@vextlabs/theron-agent-sdk.svg)](https://www.npmjs.com/package/@vextlabs/theron-agent-sdk)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org/)
-[![status](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/Vext-Labs-Inc/theron-agent-sdk/releases)
-
-Theron Agent SDK is the open-source agent development kit from [Vext Labs](https://tryvext.com). It ships the three primitives every other framework expects you to build yourself:
-
-- **Council** — multi-specialist deliberation as a first-class primitive, with deterministic reconciliation (no LLM-judge required)
-- **Verifier kernels** — typed, fast, deterministic output checkers (regex / arithmetic / citation / domain-specific) that run before output leaves the graph
-- **Stoa-signed integrations** — every SaaS call carries an ES256-signed receipt and a daily Merkle anchor, so your agents have an audit trail that holds up under regulated scrutiny
-
-Build any agent against any model. The SDK is free forever.
-
-To run agents on Vext's managed 15-specialist Council with per-tenant LoRA tuning that improves overnight on your data → sign up at [theron.tryvext.com](https://theron.tryvext.com).
-
----
-
-## Install
+[![tests](https://img.shields.io/badge/tests-64%20passing-brightgreen.svg)](#tests)
 
 ```sh
-# Install directly from GitHub (alpha — current install path)
-npm install github:Vext-Labs-Inc/theron-agent-sdk
+npm install @vextlabs/theron-agent-sdk
 ```
-
-```sh
-# Coming with v0.2 (stable API):
-# npm install @vextlabs/theron-agent-sdk
-```
-
-Requires Node 20+.
-
-> The alpha installs from GitHub directly so we can iterate on the API without semver churn on npm. We'll publish to npm at v0.2 once the surface stabilizes.
-
-## 5-line agent
 
 ```ts
 import { Agent, Runner } from "@vextlabs/theron-agent-sdk";
-// During alpha, the OpenRouter adapter is shipped in examples/. Copy it into
-// your project, or use any OpenAI-compatible adapter you already have.
-import { openrouterAdapter } from "./adapters/openrouter.js";
+import { openrouterAdapter } from "@vextlabs/theron-agent-sdk/examples/adapters/openrouter.js";
 
 const agent = new Agent({ name: "helper", instruction: "Answer helpfully." });
-const runner = new Runner({
-  model: openrouterAdapter({ apiKey: process.env.OPENROUTER_API_KEY! }),
-  default_model: "openai/gpt-4o-mini",
-});
+const runner = new Runner({ model: openrouterAdapter({ apiKey: process.env.OPENROUTER_API_KEY! }), default_model: "openai/gpt-4o-mini" });
 const result = await runner.run(agent, "What's 2+2?");
 console.log(result.output);
 ```
+
+That is a runnable agent in five lines. Requires Node 20+. An `OPENROUTER_API_KEY` gets you 200+ models through one adapter; swap in Anthropic, OpenAI, or your own OSS endpoint by writing a 30-line `ModelAdapter`.
+
+---
 
 ## 15-line Council
 
@@ -72,19 +46,33 @@ console.log(result.consensus);          // "ratified" | "split" | "refuted"
 console.log(result.disagreements);      // surfaced if specialists disagreed
 ```
 
+## Why Theron
+
+| | Theron Agent SDK | Claude Agent SDK | OpenAI Assistants | Vercel AI SDK |
+|---|---|---|---|---|
+| Multi-specialist deliberation | First-class `Council` primitive with deterministic reconciliation | Sub-agents, you write the deliberation loop | Single assistant, you wire fan-out | Single model, you wire fan-out |
+| Output verification before return | Built-in `VerifierKernels` (em-dash, AI-ism, arithmetic, citation) plus `defineVerifier` | Hooks pattern, you implement the checkers | None built-in | None built-in |
+| Audit chain on every agent action | `Receipts` primitive: content-hashed, optionally ES256-signed, Merkle-anchorable via Stoa | None built-in | None built-in | None built-in |
+
+The receipt chain is the differentiator. Every tool call, every Council vote, every output emits a content-hashed receipt you can sign with your own key and anchor in a daily Merkle root. When someone asks "did an AI do this," you hand them a document, not a vibe.
+
+The SDK is model-agnostic. The verifier kernels and the receipt chain work the same whether you point at OpenRouter, Anthropic, OpenAI, a local Ollama, or the hosted Theron substrate.
+
 ## The five primitives
 
 | Primitive | What it is | Why it matters |
 |---|---|---|
-| `Agent` | A model + instruction + tools + sub-agents + verifier slugs | The 5-line agent — every other framework starts here |
-| `Council` | N specialists + verifier kernels + a reconciler | Multi-specialist deliberation as a first-class primitive (the Hive differentiator) |
-| `Session` | Append-only event log + scoped state | Checkpoint + time-travel debug |
-| `Memory` | Cross-session, durable knowledge with semantic search | Plug in any backend (pgvector, R2, SQLite) |
-| `Tool` | Typed function with auto-injected `ToolContext` | Schema-from-signature via Zod, validated I/O |
+| `Agent` (composer) | A model + instruction + tools + sub-agents + verifier slugs | The 5-line agent — every other framework starts here |
+| `Runner` | The execution loop — LLM call + tool dispatch + verifier sweep + event stream | Pluggable `ModelAdapter` (OpenRouter, Anthropic, OpenAI, your own endpoint) |
+| `Verifier` | Deterministic render-then-judge / regex / arithmetic / citation kernels | Fast, free, no second LLM call — built-ins in `VerifierKernels` |
+| `Receipts` | `ReceiptEmitter` + sinks — Stoa-shaped, content-hashed, optionally signed | Audit trail every external system can verify, no Vext lock-in |
+| `Council` | N specialists + verifier kernels + a reconciler | Multi-specialist deliberation as a first-class primitive |
 
 Plus:
-- `Verifier` (+ built-in `VerifierKernels`) — deterministic output checks that aren't another LLM call
-- `Runner` — the execution loop; streams events; checkpoints state; pluggable model adapter
+- `Session` — append-only event log + scoped state (checkpoint + time-travel debug)
+- `Memory` — cross-session, durable knowledge (`InMemoryStore` ships; plug in pgvector / R2 / SQLite for production)
+- `Tool` — typed function with auto-injected `ToolContext`; schema-from-Zod
+- `MCPClient` — Model Context Protocol over HTTP/SSE; surfaces any MCP server as `Tool[]`
 
 ## Why a Council?
 
@@ -104,7 +92,7 @@ const out = await runner.runCouncil(council, "Review this PR for security risks"
 
 When you upgrade to Vext-managed Theron, the same Council code points at our 15 trained Layer-1 LoRA specialists — same SDK surface, dramatically better per-domain output.
 
-## Verifier kernels — fast, deterministic, free
+## Verifier kernels: fast, deterministic, free
 
 Verifier kernels are NOT another LLM call. They're small typed checkers that run after your agent produces output:
 
@@ -147,6 +135,59 @@ Every kernel runs in milliseconds. Pure regex / arithmetic / hash-equal. **No ad
 | Managed substrate path | [Vext Theron — 15-specialist Council + per-tenant LoRA tuning](https://theron.tryvext.com) | Nous Portal | Anthropic API | Vertex AI | LangGraph Cloud |
 
 We're not trying to beat Hermes-Agent on community size or Claude Agent SDK on Claude-specific polish. We're shipping the three primitives nobody else ships first-class: **Council + Verifier kernels + Signed integrations.** Plus the optional managed substrate where you get our trained specialists.
+
+## Receipts: every agent action, signable
+
+The `Receipts` primitive gives every agent action a portable, content-hashed,
+optionally signed record. Receipts are shaped to drop straight into a Stoa
+sink, but the SDK runs offline with an in-memory sink for tests.
+
+```ts
+import {
+  ReceiptEmitter, InMemoryReceiptSink, fileReceiptSink, httpReceiptSink,
+} from "@vextlabs/theron-agent-sdk";
+
+const receipts = new ReceiptEmitter({
+  sinks: [
+    new InMemoryReceiptSink(),
+    fileReceiptSink("./receipts.jsonl"),
+    httpReceiptSink({ url: "https://stoa.tryvext.com/sink", token: process.env.STOA }),
+  ],
+  issuer: "did:web:acme.com",
+  actor: "support-triage-bot",
+});
+
+runner.on(async (event) => {
+  if (event.type === "tool_call_done") {
+    await receipts.emit({
+      cap: `vext.${event.tool}`,
+      input: { tool: event.tool },
+      output: event.output,
+    });
+  }
+});
+```
+
+Every receipt has a deterministic `content_hash` (sorted-key SHA-256). Provide
+a `ReceiptSigner` to attach an ES256 / Ed25519 / HMAC detached signature.
+
+## Three sample agents
+
+The SDK ships with three runnable sample agents in `examples/`. None require
+external network credentials — every tool is mocked so the agents run offline
+against any OpenRouter-compatible model.
+
+| Example | What it shows |
+|---|---|
+| `cyber-recon-bot.ts` | Multi-tool recon chain (subdomains → ports → TLS → tech). Every tool call emits a receipt. |
+| `meeting-prep-bot.ts` | Calendar + docs + memory composition; produces a one-page meeting brief. |
+| `support-triage-bot.ts` | Three-specialist Council (classifier + retriever + writer); routing decision emitted as a signable receipt. |
+
+```sh
+OPENROUTER_API_KEY=sk-or-... npm run example:cyber
+OPENROUTER_API_KEY=sk-or-... npm run example:meeting
+OPENROUTER_API_KEY=sk-or-... npm run example:support
+```
 
 ## What this SDK is NOT
 
