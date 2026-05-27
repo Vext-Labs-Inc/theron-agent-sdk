@@ -207,6 +207,10 @@ If you want the trained 15-specialist Council, the 450+ curated industry-pack wo
 - [Migration guide (from LangChain / CrewAI / AutoGen)](./docs/migration.md)
 - [Stoa cap protocol](https://github.com/Vext-Labs-Inc/stoa)
 
+## More from Vext Labs
+
+The SDK is one corner of a larger surface. The full picture lives on the Vext Labs organization page: [github.com/Vext-Labs-Inc](https://github.com/Vext-Labs-Inc). Theron the product is at [theron.tryvext.com](https://theron.tryvext.com).
+
 ## Contributing
 
 PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). We're particularly interested in:
