@@ -216,10 +216,9 @@ a `ReceiptSigner` to attach an ES256 / Ed25519 / HMAC detached signature.
 
 ## Runnable examples
 
-The SDK ships with runnable examples in `examples/`. None require external
-network credentials: the agent examples mock every tool so they run offline
-against any OpenRouter-compatible model, and the pattern/loop examples are fully
-offline (no key at all).
+The SDK ships with runnable examples in `examples/`. The agent examples call
+openrouter.ai and need `OPENROUTER_API_KEY` plus network access; their tools are
+mocked. The pattern and loop examples run fully offline with no key.
 
 | Example | What it shows |
 |---|---|

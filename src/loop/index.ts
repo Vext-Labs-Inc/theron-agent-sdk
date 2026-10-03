@@ -167,7 +167,7 @@ export interface RatchetDecision {
  * A Ratchet is a pure function that maps a RatchetVerdict (or undefined, if no
  * verifier ran yet) to a RatchetDecision.
  *
- * The verified ratchet is the primitive that no public agent SDK ships:
+ * The verified ratchet:
  *   - Loop state advances ONLY on a proven verifier pass.
  *   - The confidence threshold is explicit and configured at construction time.
  *   - An absent verdict is treated as hold, not as pass — absence of proof is
@@ -242,9 +242,8 @@ export function verifiedRatchet(opts?: { minConfidence?: number }): Ratchet {
  * caller supplies every async function, keeping the primitive testable and
  * framework-agnostic.
  *
- * No public agent SDK exposes this propose→trial→verify→ratchet cycle as a
- * typed, composable primitive with a verifier gate at step 3. That is the gap
- * this fills.
+ * This module exposes the propose, trial, verify, ratchet cycle as a typed,
+ * composable primitive with a verifier gate at step 3.
  */
 export interface ImprovementCycleSpec<P, T> {
   /** Generate a candidate proposal. */
