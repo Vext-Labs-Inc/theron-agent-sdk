@@ -5,7 +5,21 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-03
+
+This release is breaking. It renames the package and removes the hosted default endpoint.
+
+### Migration
+- Install the new package name: `npm uninstall @vextlabs/theron-agent-sdk && npm install @vextlabs/sdk`, then change imports from `@vextlabs/theron-agent-sdk` to `@vextlabs/sdk`. `theronAdapter`, `theron`, `TheronAdapterOptions`, and the `./adapters/theron` subpath still work as deprecated aliases.
+- Pass `baseURL` (or set `VEXT_BASE_URL`). It is the OpenAI-style API root. If you used `base: X` before, requests went to `X/api/v1/chat/completions`; pass `baseURL: "X/api/v1"` to keep the same URL.
+- Pass `model` on every call. There is no `theron-council` default.
+- Pass `max_tokens` and `temperature` if you relied on the old `2048` and `0.2` defaults.
+- Pass `councilMode` if your server expects a `council_mode` field.
+- To keep sending the account token, pass `resolveJuwelToken` as `tokenProvider`.
+- Custom `ModelAdapter` implementations receive `ModelMessage[]` and should return the upstream `id` on each tool call.
+
 ### Breaking
+- **Package renamed.** The npm package `@vextlabs/theron-agent-sdk` is renamed to `@vextlabs/sdk`. The old name gets no further releases from this branch.
 - **No hosted default.** `createVextAdapter` (deprecated alias `theronAdapter`) does not call a hosted endpoint. `baseURL` is the OpenAI-style API root. `chat` POSTs to `<baseURL>/chat/completions` (trailing slashes on the path stripped; a `?query` or `#fragment` on `baseURL`, such as Azure's `?api-version=`, is kept after the appended path). `https://api.openai.com/v1` posts to `https://api.openai.com/v1/chat/completions`. `http://127.0.0.1:11434/v1` posts to `http://127.0.0.1:11434/v1/chat/completions`. `chat` throws `MissingBaseURLError` with the message `No hosted default endpoint; pass baseURL or set VEXT_BASE_URL` when `baseURL`, the deprecated `base` option, `VEXT_BASE_URL`, and `THERON_BASE_URL` are all unset. The throw happens before any network call. `VEXT_BASE_URL` wins over `THERON_BASE_URL` when both are set. `baseURL` wins over `base` and over both env vars. Set `baseURL` together with `apiKey`; if `baseURL` is omitted, the env base decides where the key is sent.
 - **No default model, and no default `council_mode`.** `chat` throws `Missing model; pass model` when `model` is missing or blank. `council_mode` is included in the JSON body only when the caller sets `councilMode`.
 - **Package name.** The npm package is `@vextlabs/sdk`. Primary exports are `createVextAdapter`, `vext`, `VextAdapter`, and `VextAdapterOptions`, plus the `@vextlabs/sdk/adapters/vext` subpath. `theronAdapter`, `theron`, `TheronAdapterOptions`, and `@vextlabs/sdk/adapters/theron` remain as deprecated aliases. Root and subpath bundles share one `MissingBaseURLError` class via build splitting.
@@ -18,6 +32,11 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Streamed token usage.** Streaming requests send `stream_options: { include_usage: true }`, so servers that only report usage on request now do.
 
 Known issue: published 0.4.1's default host redirects and the follow-on chat completions route returns 404. This release does not call that host.
+
+### Changed
+- **`VERSION` export.** `VERSION` now reports `0.5.0`. It previously reported `0.3.2`.
+- **Non-Node runtimes.** The adapter reads env vars through a guarded `globalThis.process`, so it works where `process` is undefined.
+- **Security contact.** Report vulnerabilities to `juwel@vextlabs.ai` with the subject line `Security`. See `SECURITY.md`.
 
 ### Security
 - **Adapter fetch does not follow redirects.** `createVextAdapter` sets `redirect: "error"`, so a 302 or 307 cannot replay `Authorization` to another origin, including under fetch polyfills that follow by default. Cloudflare Workers supports this mode: the Request `redirect` option is `follow`, `error`, or `manual` ([Workers Request docs](https://developers.cloudflare.com/workers/runtime-apis/request/), reviewed 2026-07-02).

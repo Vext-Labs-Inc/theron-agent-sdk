@@ -66,9 +66,9 @@ console.log(result.disagreements);      // surfaced if specialists disagreed
 |---|---|---|---|---|
 | Multi-specialist deliberation | `Council` primitive with deterministic reconciliation | Sub-agents, you write the deliberation loop | Single assistant, you wire fan-out | Single model, you wire fan-out |
 | Output verification before return | Built-in `VerifierKernels` (em-dash, AI-ism, arithmetic, citation) plus `defineVerifier` | Hooks pattern, you implement the checkers | None built-in | None built-in |
-| Audit chain on every agent action | `Receipts` primitive: content-hashed, optionally ES256-signed, Merkle-anchorable via Stoa | None built-in | None built-in | None built-in |
+| Audit chain on every agent action | `Receipts` primitive: content-hashed, optionally signed with a `ReceiptSigner` you supply | None built-in | None built-in | None built-in |
 
-Every tool call, Council vote, and output can emit a content-hashed receipt that you sign with your own key and anchor in a daily Merkle root. When someone asks whether an AI produced a result, the receipts are the record you can show them.
+Your code can record a tool call, Council vote, or output as a content-hashed receipt and sign it with your own key. When someone asks whether an AI produced a result, the receipts are the record you can show them.
 
 The verifier kernels and the receipt chain do not depend on a vendor. Point `createVextAdapter` at an OpenAI-style API root (`<baseURL>/chat/completions`), such as `https://api.openai.com/v1` or `http://127.0.0.1:11434/v1`.
 
@@ -79,7 +79,7 @@ The verifier kernels and the receipt chain do not depend on a vendor. Point `cre
 | `Agent` (composer) | A model + instruction + tools + sub-agents + verifier slugs | The 5-line agent, where most frameworks start |
 | `Runner` | The execution loop: LLM call + tool dispatch + verifier sweep + event stream | Pluggable `ModelAdapter` (OpenRouter, Anthropic, OpenAI, your own endpoint) |
 | `Verifier` | Deterministic render-then-judge / regex / arithmetic / citation kernels | Fast, free, no second LLM call. Built-ins live in `VerifierKernels` |
-| `Receipts` | `ReceiptEmitter` + sinks: Stoa-shaped, content-hashed, optionally signed | Audit trail every external system can verify, no Vext lock-in |
+| `Receipts` | `ReceiptEmitter` + sinks: content-hashed, optionally signed | A record of agent actions that you store and sign with your own sinks and keys |
 | `Council` | N specialists + verifier kernels + a reconciler | Multi-specialist deliberation as a built-in primitive |
 
 Plus:
@@ -175,15 +175,14 @@ five run end-to-end (offline, no API key).
 | Memory + Session | Session (event log) + Memory (cross-session, swappable backend) | Honcho dialectic | Hooks-based | ADK Memory | Checkpointer |
 | Tool typing | **Zod schemas, validated I/O** | Function decorators | Pydantic schemas | Pydantic | Pydantic |
 | Model calls | **POST `<baseURL>/chat/completions`** | Yes, 200+ via OpenRouter | Claude-optimized | Gemini-optimized | Yes |
-| Signed integrations | **Stoa cap protocol (ES256 receipts + Merkle anchor)** | MCP (no integrity) | MCP | MCP | Custom |
 
-This package includes a Council primitive, typed verifier kernels, and signed receipts.
+This package includes a Council primitive, typed verifier kernels, and optionally signed receipts.
 
 ## Receipts: every agent action, signable
 
-The `Receipts` primitive gives every agent action a portable, content-hashed,
-optionally signed record. Receipts are shaped to drop straight into a Stoa
-sink, but the SDK runs offline with an in-memory sink for tests.
+The `Receipts` primitive gives an agent action a portable, content-hashed,
+optionally signed record. Sinks write receipts to memory, a JSONL file, or an
+HTTP endpoint you provide. The in-memory sink works offline, for tests.
 
 ```ts
 import {
@@ -194,7 +193,7 @@ const receipts = new ReceiptEmitter({
   sinks: [
     new InMemoryReceiptSink(),
     fileReceiptSink("./receipts.jsonl"),
-    httpReceiptSink({ url: "https://receipts.example/sink", token: process.env.STOA }),
+    httpReceiptSink({ url: "https://receipts.example/sink", token: process.env.RECEIPT_SINK_TOKEN }),
   ],
   issuer: "did:web:acme.com",
   actor: "support-triage-bot",

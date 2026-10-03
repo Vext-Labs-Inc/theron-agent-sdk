@@ -1,7 +1,7 @@
 {
   "name": "@vextlabs/sdk",
-  "version": "0.4.1",
-  "description": "Open-source agent SDK with a Council of specialists, deterministic verifier kernels, and Stoa-signed integrations. Build any agent against any model. From Vext Labs.",
+  "version": "0.5.0",
+  "description": "MIT-licensed TypeScript agent SDK with a Council of specialists, deterministic verifier kernels, and content-hashed action receipts. Works with any OpenAI-style endpoint you configure. From Vext Labs.",
   "license": "MIT",
   "homepage": "https://github.com/Vext-Labs-Inc/theron-agent-sdk#readme",
   "repository": {
@@ -19,7 +19,6 @@
     "council",
     "deliberation",
     "verifier-kernels",
-    "stoa",
     "domain-specialists",
     "vext",
     "vext-labs",

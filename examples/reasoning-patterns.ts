@@ -1,8 +1,8 @@
 /**
  * Sample: Reasoning patterns
  *
- * Demonstrates the framework-agnostic reasoning-pattern primitives — the
- * SDK-side counterparts of the server-side hive loops. No API key needed: this
+ * Demonstrates the framework-agnostic reasoning-pattern primitives.
+ * No API key needed: this
  * example uses a deterministic mock "model" so it runs offline and its output is
  * stable. Swap the mock for any provider call (OpenRouter, Anthropic, OpenAI,
  * a local model) and the patterns are unchanged.
