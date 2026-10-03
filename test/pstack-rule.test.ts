@@ -44,6 +44,13 @@ describe("PSTACK / Vstack rule file", () => {
     }
     expect(text).toMatch(/GitHub Actions is not the merge gate/);
   });
+
+  it("does not require Cursor or pin npm test to a specific runner", () => {
+    const text = read(rulePath);
+    expect(text).toContain("locally in any editor or in Cursor");
+    expect(text).not.toMatch(/Checks run in Cursor/);
+    expect(text).not.toContain("vitest run");
+  });
 });
 
 describe("CONTRIBUTING pointer", () => {
@@ -69,5 +76,12 @@ describe("PR template receipt block", () => {
     ]) {
       expect(text).toContain(`**${field}`);
     }
+  });
+
+  it("marks the receipt optional for external contributors and uses placeholder counts", () => {
+    const text = read(templatePath);
+    expect(text).toContain("Optional for external contributors");
+    expect(text).toContain("<pass> / <fail> / <skip>");
+    expect(text).not.toMatch(/\b\d+ \/ \d+ \/ \d+ \/ \d+\b/);
   });
 });

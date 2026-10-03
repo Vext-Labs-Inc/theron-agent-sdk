@@ -45,8 +45,8 @@ that was actually proven.
 
 ## Where checks run
 
-- Checks run in Cursor: on cloud agents or on the maintainer's machine. Those runs, with receipts in
-  the PR body, are the merge gate.
+- Checks can run locally in any editor or in Cursor, with receipts in the PR body. Contributors do
+  not need Cursor to contribute.
 - GitHub Actions is not the merge gate for this repo. A green or missing Actions run does not
   replace a receipt, and a receipt must not cite Actions output as its only proof.
 
@@ -55,8 +55,8 @@ that was actually proven.
 Use the scripts this package actually ships. Do not reference tooling from other repos.
 
 - `npm ci` to install from the lockfile.
-- `npm test` (`vitest run`) for the full suite. Read the `Test Files` and `Tests` summary lines for
-  counts; add `--reporter=verbose` when a per-test list is useful.
+- `npm test` for the full suite (whatever the `test` script in `package.json` runs). Read the
+  summary lines it prints for pass / fail / skipped counts.
 - `npm run build` (`tsup`) for a clean ESM + CJS + type declaration build.
 - `npm run test:coverage` when a change touches `src/` coverage thresholds.
 - `npm run example:<name>` when a change affects an example under `examples/`.
@@ -81,6 +81,6 @@ this repo, so do not create files for them here:
 
 ## PR receipt block
 
-Every PR fills in the "PSTACK / Vstack receipt" section of `.github/pull_request_template.md`:
+Maintainers fill in the "PSTACK / Vstack receipt" section of `.github/pull_request_template.md`:
 lane / orchestrator note, claim ceiling, blast radius if relevant, test counts before and after,
-and rollback.
+and rollback. It is optional for external contributors.
