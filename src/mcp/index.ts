@@ -69,7 +69,7 @@ interface JsonRpcResponse {
  */
 export class MCPClient {
   readonly config: McpServerConfig;
-  private initialized = false;
+  private initPromise: Promise<void> | null = null;
   private toolCache: McpTool[] | null = null;
 
   constructor(config: McpServerConfig) {
@@ -156,7 +156,22 @@ export class MCPClient {
   }
 
   private async ensureInitialized(signal?: AbortSignal): Promise<void> {
-    if (this.initialized) return;
+    // Single-flight: concurrent listTools()/asTools()/callTool() callers share
+    // one in-flight initialize handshake instead of each firing their own
+    // (which spec-strict servers reject as a duplicate session). On failure the
+    // promise is cleared so a later call can retry.
+    if (!this.initPromise) {
+      this.initPromise = this.doInitialize(signal);
+    }
+    try {
+      await this.initPromise;
+    } catch (err) {
+      this.initPromise = null;
+      throw err;
+    }
+  }
+
+  private async doInitialize(signal?: AbortSignal): Promise<void> {
     await this.rpc(
       "initialize",
       {
@@ -168,7 +183,6 @@ export class MCPClient {
     );
     // notifications/initialized is fire-and-forget per spec.
     this.rpc("notifications/initialized", {}, signal).catch(() => undefined);
-    this.initialized = true;
   }
 
   private async rpc(

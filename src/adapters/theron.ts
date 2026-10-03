@@ -1,7 +1,8 @@
 /**
- * Theron ModelAdapter — first-class, built-in. Drives the Vext-hosted Theron
- * council so agents you build with this SDK run on Theron's substrate (the
+ * JUWEL ModelAdapter — first-class, built-in. Drives the Vext-hosted JUWEL
+ * council so agents you build with this SDK run on JUWEL's substrate (the
  * trained specialists + verifier kernels), not a single foundation model.
+ * Export symbol names keep `theron*` for npm API compatibility.
  *
  *   import { Agent, Runner, theronAdapter } from "@vextlabs/theron-agent-sdk";
  *
@@ -19,9 +20,9 @@ import type { ModelAdapter } from "../runtime/index.js";
 import { resolveJuwelToken } from "./juwel_auth.js";
 
 export interface TheronAdapterOptions {
-  /** Endpoint base. Defaults to the hosted council at itstheron.com. */
+  /** Endpoint base. Defaults to the hosted council at juwel.ai. */
   base?: string;
-  /** Vext / Theron bearer key. Optional for free-tier LLM caps; required for
+  /** Vext / JUWEL bearer key. Optional for free-tier LLM caps; required for
    *  anything privileged. When set, it takes precedence over `tokenProvider`. */
   apiKey?: string;
   /** Async bearer resolver, used only when `apiKey` is absent. Defaults to
@@ -33,9 +34,9 @@ export interface TheronAdapterOptions {
   councilMode?: "fast" | "full";
 }
 
-/** Build a first-class Theron adapter. Alias: `theron`. */
+/** Build a first-class JUWEL adapter. Alias: `theron` (legacy export name). */
 export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
-  const base = (opts.base ?? "https://itstheron.com").replace(/\/$/, "");
+  const base = (opts.base ?? "https://juwel.ai").replace(/\/$/, "");
   const url = `${base}/api/v1/chat/completions`;
   const councilMode = opts.councilMode ?? "fast";
   const tokenProvider = opts.tokenProvider ?? resolveJuwelToken;
@@ -70,7 +71,7 @@ export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
 
       const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
       if (!res.ok) {
-        throw new Error(`Theron ${res.status} (${url}): ${(await res.text().catch(() => "")).slice(0, 500)}`);
+        throw new Error(`JUWEL ${res.status} (${url}): ${(await res.text().catch(() => "")).slice(0, 500)}`);
       }
 
       // Streaming path — OpenAI-style SSE deltas.

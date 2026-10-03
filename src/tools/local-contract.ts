@@ -84,10 +84,20 @@ export const LOCAL_TOOL_PARAMETERS: Record<string, Record<string, unknown>> = {
   Grep: {
     type: "object",
     properties: {
-      pattern: { type: "string", description: "Regex pattern." },
+      pattern: { type: "string", description: "Regex pattern (ripgrep syntax). Use fixed_strings for a literal search." },
       path: { type: "string", description: "Optional file or directory to limit the search." },
-      glob: { type: "string", description: "Optional glob filter, e.g. '*.ts'." },
-      case_insensitive: { type: "boolean", default: false },
+      glob: { type: "string", description: "Optional glob filter, e.g. '*.ts' or 'src/**/*.tsx'." },
+      type: { type: "string", description: "Optional file-type filter (ripgrep --type), e.g. 'ts', 'py', 'rust'. More efficient than glob for language filters." },
+      case_insensitive: { type: "boolean", default: false, description: "Case-insensitive match." },
+      output_mode: {
+        type: "string",
+        enum: ["content", "files_with_matches", "count"],
+        description: "What to return: 'content' = matching lines with file:line (default), 'files_with_matches' = just the file paths, 'count' = per-file match counts.",
+        default: "content",
+      },
+      context_lines: { type: "number", description: "Lines of context to show before AND after each match (ripgrep -C). Only applies to output_mode 'content'." },
+      multiline: { type: "boolean", default: false, description: "Allow the pattern to span line boundaries (ripgrep --multiline; '.' matches newlines)." },
+      fixed_strings: { type: "boolean", default: false, description: "Treat the pattern as a literal string, not a regex (ripgrep -F)." },
     },
     required: ["pattern"],
   },
@@ -95,6 +105,9 @@ export const LOCAL_TOOL_PARAMETERS: Record<string, Record<string, unknown>> = {
     type: "object",
     properties: {
       path: { type: "string", description: "Path to list. Defaults to the working directory." },
+      show_hidden: { type: "boolean", default: false, description: "Include dotfiles (.env, .gitignore, .github, etc.) in the listing." },
+      recursive: { type: "boolean", default: false, description: "List subdirectories recursively (up to `depth` levels)." },
+      depth: { type: "number", description: "Max recursion depth when recursive=true (default 3)." },
     },
   },
 };

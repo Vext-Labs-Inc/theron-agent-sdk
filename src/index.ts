@@ -1,4 +1,4 @@
-// Theron Agent SDK — public surface.
+// JUWEL Agent SDK — public surface (npm package name remains @vextlabs/theron-agent-sdk).
 //
 // The minimum import to build an agent:
 //   import { Agent, Council, Tool, Runner } from "@vextlabs/theron-agent-sdk";
@@ -85,8 +85,9 @@ export type {
 export { MCPClient, collectMcpTools } from "./mcp/index.js";
 export type { McpServerConfig, McpTool } from "./mcp/index.js";
 
-// First-class Theron adapter — drives the Vext-hosted council so agents built
-// with this SDK run on Theron's substrate out of the box. Alias: `theron`.
+// First-class JUWEL adapter — drives the Vext-hosted council so agents built
+// with this SDK run on JUWEL's substrate out of the box. Export names `theron` /
+// `theronAdapter` kept for publish API compatibility.
 export { theronAdapter, theron } from "./adapters/theron.js";
 export type { TheronAdapterOptions } from "./adapters/theron.js";
 // JUWEL account token provider — one sign-in (`juwel login`) authenticates the

@@ -1,6 +1,6 @@
 // patterns/index.ts — reasoning patterns as framework-agnostic primitives.
 //
-// Theron's server-side Hive runs these as loops; this module generalizes them
+// JUWEL's server-side Hive runs these as loops; this module generalizes them
 // for ANY SDK user, on ANY provider. Each primitive takes provider-agnostic
 // async functions (generate / score / verify / critique) and returns a typed,
 // auditable result. No public agent SDK ships verifier/score-gated reasoning

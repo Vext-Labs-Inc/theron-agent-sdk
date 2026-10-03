@@ -13,7 +13,7 @@
 //   - Confidence is explicit and required — not a subjective LLM self-report.
 //   - The decision is typed and auditable; every advance/hold carries a reason.
 //
-// This mirrors the server-side Agent R&D Loop shipped in Theron's own
+// This mirrors the server-side Agent R&D Loop shipped in JUWEL's own
 // continual-improvement pipeline (CIP) where weight updates are committed only
 // on verified ratchet passes.
 
@@ -183,13 +183,13 @@ export interface RatchetDecision {
  *   - An absent verdict is treated as hold, not as pass — absence of proof is
  *     not proof of absence.
  *
- * This matches Theron's own server-side CIP loop, where weight commits require
+ * This matches JUWEL's own server-side CIP loop, where weight commits require
  * a verifier pass + confidence >= threshold before the ratchet clicks forward.
  */
 export type Ratchet = (v: RatchetVerdict | undefined) => RatchetDecision;
 
 /**
- * verifiedRatchet — the canonical Theron loop gate.
+ * verifiedRatchet — the canonical JUWEL loop gate.
  *
  * Returns a Ratchet that advances ONLY when:
  *   1. A verdict is present (not undefined).
@@ -338,6 +338,9 @@ export interface CompactHistoryOptions {
   /** Only compact when total content chars exceed this (default 0 = compact
    *  whenever there is more history than keepRecent). */
   maxChars?: number;
+  /** Role to attach the summary message under. Default 'system'. Set to 'user'
+   *  for providers (e.g. Anthropic) that reject a second system message. */
+  summaryRole?: "system" | "user";
 }
 
 export interface CompactHistoryResult {
@@ -366,8 +369,9 @@ export async function compactHistory(opts: CompactHistoryOptions): Promise<Compa
   const older = msgs.slice(0, msgs.length - keepRecent);
   const recent = msgs.slice(msgs.length - keepRecent);
   const summary = String(await opts.summarize(older));
+  const summaryRole = opts.summaryRole ?? 'system';
   return {
-    messages: [{ role: 'system', content: `${SUMMARY_PREFIX}\n${summary}` }, ...recent],
+    messages: [{ role: summaryRole, content: `${SUMMARY_PREFIX}\n${summary}` }, ...recent],
     compacted: true,
     summary,
     droppedCount: older.length,

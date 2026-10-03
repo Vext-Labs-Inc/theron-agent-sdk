@@ -79,26 +79,70 @@ export function defineTool<TSchema extends z.ZodTypeAny, TOutput>(opts: {
   };
 }
 
-// Minimal Zod → JSON Schema converter. Covers the common shapes the SDK's own
-// samples need. Production users can swap in `zod-to-json-schema` for full
-// coverage (enums, unions, discriminated unions, refinements, etc.).
+// Zod → JSON Schema converter. Covers the shapes a real tool surface needs:
+// objects (with default-aware required), strings/numbers/booleans, arrays,
+// optionals, nullables, defaults, enums, literals, unions, and records. A
+// `.describe()` annotation on any node is carried through to the schema so the
+// model sees per-field guidance. Falls back to an unconstrained value only for
+// genuinely opaque types (z.any/z.unknown/effects). Production users who need
+// discriminated unions or refinements can still swap in `zod-to-json-schema`.
 function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
+  const description = (schema._def as { description?: string })?.description;
+  const withDesc = (s: Record<string, unknown>): Record<string, unknown> =>
+    description ? { ...s, description } : s;
+
+  // Unwrap wrappers first so the inner type drives the JSON type.
+  if (schema instanceof z.ZodOptional) return zodToJsonSchema(schema.unwrap());
+  if (schema instanceof z.ZodDefault) {
+    const innerType = (schema._def as { innerType: z.ZodTypeAny }).innerType;
+    const inner = zodToJsonSchema(innerType);
+    let def: unknown;
+    try {
+      def = (schema._def as { defaultValue?: () => unknown }).defaultValue?.();
+    } catch {
+      def = undefined;
+    }
+    return withDesc(def === undefined ? inner : { ...inner, default: def });
+  }
+  if (schema instanceof z.ZodNullable) {
+    return withDesc({ ...zodToJsonSchema(schema.unwrap()), nullable: true });
+  }
+
   if (schema instanceof z.ZodObject) {
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
     for (const [key, value] of Object.entries(schema.shape)) {
-      properties[key] = zodToJsonSchema(value as z.ZodTypeAny);
-      if (!(value instanceof z.ZodOptional)) required.push(key);
+      const field = value as z.ZodTypeAny;
+      properties[key] = zodToJsonSchema(field);
+      // A field is optional if it's wrapped in .optional() OR carries a default.
+      if (!(field instanceof z.ZodOptional) && !(field instanceof z.ZodDefault)) {
+        required.push(key);
+      }
     }
-    return { type: "object", properties, ...(required.length > 0 ? { required } : {}) };
+    return withDesc({ type: "object", properties, ...(required.length > 0 ? { required } : {}) });
   }
-  if (schema instanceof z.ZodString) return { type: "string" };
-  if (schema instanceof z.ZodNumber) return { type: "number" };
-  if (schema instanceof z.ZodBoolean) return { type: "boolean" };
-  if (schema instanceof z.ZodArray) return { type: "array", items: zodToJsonSchema(schema.element) };
-  if (schema instanceof z.ZodOptional) return zodToJsonSchema(schema.unwrap());
-  if (schema instanceof z.ZodEnum) return { type: "string", enum: schema.options };
-  return { type: "string" };
+  if (schema instanceof z.ZodString) return withDesc({ type: "string" });
+  if (schema instanceof z.ZodNumber) return withDesc({ type: "number" });
+  if (schema instanceof z.ZodBoolean) return withDesc({ type: "boolean" });
+  if (schema instanceof z.ZodArray) return withDesc({ type: "array", items: zodToJsonSchema(schema.element) });
+  if (schema instanceof z.ZodEnum) return withDesc({ type: "string", enum: schema.options });
+  if (schema instanceof z.ZodLiteral) {
+    const val = (schema as z.ZodLiteral<string | number | boolean>).value;
+    const t = typeof val === "number" ? "number" : typeof val === "boolean" ? "boolean" : "string";
+    return withDesc({ type: t, enum: [val] });
+  }
+  if (schema instanceof z.ZodUnion) {
+    const options = (schema._def as { options: z.ZodTypeAny[] }).options;
+    return withDesc({ anyOf: options.map((o) => zodToJsonSchema(o)) });
+  }
+  if (schema instanceof z.ZodRecord) {
+    const valueType = (schema._def as { valueType?: z.ZodTypeAny }).valueType;
+    return withDesc({
+      type: "object",
+      additionalProperties: valueType ? zodToJsonSchema(valueType) : true,
+    });
+  }
+  return withDesc({ type: "string" });
 }
 
 export { z as zod };

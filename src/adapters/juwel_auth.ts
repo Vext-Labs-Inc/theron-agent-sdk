@@ -1,5 +1,5 @@
 /**
- * JUWEL account — token provider for the Theron adapter.
+ * JUWEL account — token provider for the JUWEL adapter.
  *
  * One JUWEL account, every surface. Rather than pasting an API key, a user can
  * `juwel login` (from the CLI / VS Code / MCP) which runs the browserless
