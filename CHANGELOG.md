@@ -7,6 +7,8 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 - **Implicit account token stays on the default origin.** `theronAdapter` attaches `JUWEL_TOKEN` or `~/.juwel/config.json` only when the effective `base` origin is the default hosted origin. A custom `base` no longer receives that token. An explicit `apiKey` or `tokenProvider` is still sent.
+- **Adapter fetch does not follow redirects.** `theronAdapter` sets `redirect: "error"`, so a 302 or 307 cannot replay `Authorization` to another origin, including under fetch polyfills that follow by default.
+- **Session shells do not inherit secret env vars.** `LocalCloudSession.exec` copies a small allowlist from `process.env` (`PATH`, `HOME`, `LANG`, `TERM`, and similar locale and temp variables) and then `options.env`. `JUWEL_TOKEN` and names ending in `_TOKEN`, `_KEY`, or `_SECRET` are not copied from the parent environment. Values passed in `options.env` are still set.
 
 ## [0.3.2] - 2026-06-27
 

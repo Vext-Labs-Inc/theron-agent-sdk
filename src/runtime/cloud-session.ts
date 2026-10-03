@@ -42,8 +42,50 @@ export interface CloudExecOptions {
   cwd?: string;
   /** Hard timeout in ms (default 120000). */
   timeoutMs?: number;
-  /** Extra environment variables for the command. */
+  /**
+   * Extra environment variables for the command. Copied as given, after the
+   * inherited allowlist. This is the only way to pass a name that is not on
+   * that allowlist.
+   */
   env?: Record<string, string>;
+}
+
+/**
+ * Names copied from `process.env` into a session shell. Everything else in the
+ * parent environment is dropped, including `JUWEL_TOKEN` and any name ending in
+ * `_TOKEN`, `_KEY`, or `_SECRET`.
+ */
+const INHERITED_ENV_KEYS = [
+  "PATH",
+  "HOME",
+  "LANG",
+  "LANGUAGE",
+  "LC_ALL",
+  "LC_CTYPE",
+  "TERM",
+  "TZ",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "SHELL",
+  "USER",
+  "LOGNAME",
+] as const;
+
+const SENSITIVE_ENV_NAME = /(_TOKEN|_KEY|_SECRET)$/i;
+
+/** Allowlisted parent env, then the caller's explicit `options.env`. */
+function sessionCommandEnv(extra?: Record<string, string>): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const key of INHERITED_ENV_KEYS) {
+    if (SENSITIVE_ENV_NAME.test(key)) continue;
+    const value = process.env[key];
+    if (typeof value === "string") env[key] = value;
+  }
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) env[key] = value;
+  }
+  return env;
 }
 
 /**
@@ -89,6 +131,11 @@ function resolveInside(root: string, p: string): string {
 /**
  * In-process {@link CloudSession} backend: a temp workspace on the host, commands
  * via `/bin/sh -c`. For tests/CI/local dev only — NOT a security boundary.
+ *
+ * `exec` does not pass the parent `process.env` through. It copies an allowlist
+ * (`PATH`, `HOME`, `LANG`, `TERM`, and similar) and then `options.env`.
+ * `JUWEL_TOKEN` and names ending in `_TOKEN`, `_KEY`, or `_SECRET` are omitted
+ * from the inherited set. A name the caller sets on `options.env` is passed.
  */
 export class LocalCloudSession implements CloudSession {
   readonly id: string;
@@ -107,7 +154,7 @@ export class LocalCloudSession implements CloudSession {
       const { stdout, stderr } = await pExecFile("/bin/sh", ["-c", command], {
         cwd,
         timeout: options.timeoutMs ?? 120_000,
-        env: { ...process.env, ...(options.env ?? {}) },
+        env: sessionCommandEnv(options.env),
         maxBuffer: 64 * 1024 * 1024,
       });
       return { stdout: stdout.toString(), stderr: stderr.toString(), exitCode: 0 };

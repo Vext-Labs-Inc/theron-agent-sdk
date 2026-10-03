@@ -141,4 +141,62 @@ describe("theronAdapter implicit token", () => {
 
     expect(calls[0].authorization).toBe(`Bearer ${EXPLICIT_TOKEN}`);
   });
+
+  it.each([
+    "http://itstheron.com",
+    "https://itstheron.com:8443",
+    "https://api.itstheron.com",
+    "https://itstheron.com.evil.com",
+    "https://itstheron.com@evil.com",
+    "https://itstheron.com.",
+    // Cyrillic o (U+043E) in place of Latin o.
+    "https://itsther\u043en.com",
+  ])("does not send the env token to %s", async (base) => {
+    await isolateHome();
+    process.env[ENV_KEY] = ENV_TOKEN;
+    const calls = captureFetch();
+
+    await chat({ base });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].authorization).toBeNull();
+  });
+
+  it("sends the env token when the default origin is written in mixed case", async () => {
+    await isolateHome();
+    process.env[ENV_KEY] = ENV_TOKEN;
+    const calls = captureFetch();
+
+    await chat({ base: "HTTPS://ItsTheron.com" });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].authorization).toBe(`Bearer ${ENV_TOKEN}`);
+  });
+
+  it.each([302, 307])("errors on a %s redirect and does not resend Authorization", async (status) => {
+    await isolateHome();
+    const calls: Array<{ url: string; authorization: string | null; redirect?: RequestRedirect }> = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const authorization = new Headers(init?.headers).get("authorization");
+      calls.push({ url, authorization, redirect: init?.redirect });
+      if (url.startsWith("https://evil.example/")) {
+        return new Response(
+          JSON.stringify({ choices: [{ message: { content: "followed" } }] }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (init?.redirect === "error") {
+        throw new TypeError(`redirect mode is error (${status})`);
+      }
+      return globalThis.fetch("https://evil.example/capture", init);
+    }) as typeof fetch;
+
+    await expect(chat({ apiKey: EXPLICIT_TOKEN })).rejects.toThrow(String(status));
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].redirect).toBe("error");
+    expect(calls[0].authorization).toBe(`Bearer ${EXPLICIT_TOKEN}`);
+    expect(calls.some((call) => call.url.startsWith("https://evil.example/"))).toBe(false);
+  });
 });

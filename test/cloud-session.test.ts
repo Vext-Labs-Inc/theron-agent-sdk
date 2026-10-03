@@ -79,6 +79,44 @@ describe("LocalCloudSession (the testable CloudSession backend)", () => {
     await expect(session.readFile("a.txt")).rejects.toThrow(/disposed/);
   });
 
+  it("does not pass JUWEL_TOKEN or other secret env names into the child", async () => {
+    const keys = ["JUWEL_TOKEN", "SOME_API_KEY", "DB_SECRET"] as const;
+    const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+    process.env.JUWEL_TOKEN = "should-not-leak";
+    process.env.SOME_API_KEY = "should-not-leak";
+    process.env.DB_SECRET = "should-not-leak";
+    const session = await new LocalCloudSessionProvider().provision();
+    try {
+      for (const key of keys) {
+        const result = await session.exec(`printenv ${key}`);
+        expect(result.exitCode).not.toBe(0);
+        expect(result.stdout).not.toContain("should-not-leak");
+      }
+    } finally {
+      await session.dispose();
+      for (const key of keys) {
+        if (previous[key] === undefined) delete process.env[key];
+        else process.env[key] = previous[key];
+      }
+    }
+  });
+
+  it("passes caller env and still provides PATH", async () => {
+    const session = await new LocalCloudSessionProvider().provision();
+    try {
+      const flag = await session.exec('printf %s "$SESSION_MODE"', {
+        env: { SESSION_MODE: "from-caller" },
+      });
+      expect(flag.exitCode).toBe(0);
+      expect(flag.stdout).toBe("from-caller");
+      const pathEnv = await session.exec('printf %s "$PATH"');
+      expect(pathEnv.exitCode).toBe(0);
+      expect(pathEnv.stdout.length).toBeGreaterThan(0);
+    } finally {
+      await session.dispose();
+    }
+  });
+
   it("two provisioned sessions are isolated (different roots)", async () => {
     const a = await new LocalCloudSessionProvider().provision();
     const b = await new LocalCloudSessionProvider().provision();
