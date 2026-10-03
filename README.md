@@ -1,4 +1,4 @@
-# Theron Agent SDK
+# JUWEL Agent SDK
 
 > Build agents that work, with receipts you can verify. Any model. MIT.
 
@@ -46,9 +46,9 @@ console.log(result.consensus);          // "ratified" | "split" | "refuted"
 console.log(result.disagreements);      // surfaced if specialists disagreed
 ```
 
-## Why Theron
+## Why JUWEL
 
-| | Theron Agent SDK | Claude Agent SDK | OpenAI Assistants | Vercel AI SDK |
+| | JUWEL Agent SDK | Claude Agent SDK | OpenAI Assistants | Vercel AI SDK |
 |---|---|---|---|---|
 | Multi-specialist deliberation | First-class `Council` primitive with deterministic reconciliation | Sub-agents, you write the deliberation loop | Single assistant, you wire fan-out | Single model, you wire fan-out |
 | Output verification before return | Built-in `VerifierKernels` (em-dash, AI-ism, arithmetic, citation) plus `defineVerifier` | Hooks pattern, you implement the checkers | None built-in | None built-in |
@@ -56,7 +56,7 @@ console.log(result.disagreements);      // surfaced if specialists disagreed
 
 The receipt chain is the differentiator. Every tool call, every Council vote, every output emits a content-hashed receipt you can sign with your own key and anchor in a daily Merkle root. When someone asks "did an AI do this," you hand them a document, not a vibe.
 
-The SDK is model-agnostic. The verifier kernels and the receipt chain work the same whether you point at OpenRouter, Anthropic, OpenAI, a local Ollama, or the hosted Theron substrate.
+The SDK is model-agnostic. The verifier kernels and the receipt chain work the same whether you point at OpenRouter, Anthropic, OpenAI, a local Ollama, or the hosted JUWEL substrate.
 
 ## The five primitives
 
@@ -76,7 +76,7 @@ Plus:
 
 ## Why a Council?
 
-Every other agent framework binds to a model name string (`gpt-4o`, `claude-3-5-sonnet`). Theron Agent SDK binds to a Council of N specialists who deliberate and produce a reconciled answer.
+Every other agent framework binds to a model name string (`gpt-4o`, `claude-3-5-sonnet`). JUWEL Agent SDK binds to a Council of N specialists who deliberate and produce a reconciled answer.
 
 ```ts
 // Standard agent — one model decides
@@ -90,7 +90,7 @@ const out = await runner.runCouncil(council, "Review this PR for security risks"
 
 **The Council primitive doesn't require Vext's managed substrate.** You can run a Council of three generic OpenRouter agents and the SDK handles the deliberation + verifier dispatch + reconciliation locally.
 
-When you upgrade to Vext-managed Theron, the same Council code points at our 15 trained Layer-1 LoRA specialists — same SDK surface, dramatically better per-domain output.
+When you upgrade to Vext-managed JUWEL, the same Council code points at our 15 trained Layer-1 LoRA specialists — same SDK surface, dramatically better per-domain output.
 
 ## Verifier kernels: fast, deterministic, free
 
@@ -121,9 +121,43 @@ const noProfanity = defineVerifier({
 
 Every kernel runs in milliseconds. Pure regex / arithmetic / hash-equal. **No additional LLM cost.**
 
+## Reasoning patterns & loop primitives
+
+Framework- and provider-agnostic primitives for verifier/score-gated reasoning —
+the SDK-side counterparts of JUWEL's server Hive loops. Each takes plain async
+functions (`generate` / `score` / `verify` / `critique`), so they work on any
+model and compose anywhere. No other public agent SDK ships these as first-class
+typed primitives.
+
+```ts
+import {
+  selfConsistency,    // sample N paths → majority answer + agreement ratio
+  bestOfN,            // verifier-guided best-of-N
+  selfRefine,         // draft → critique → revise (early-exit when clean)
+  treeOfThoughts,     // best-first branch / score / expand search
+  chainOfVerification,// draft → verify claims independently → revise
+  mixtureOfAgents,    // layered multi-agent propose → refine → aggregate
+  reflexion,          // retry with accumulated verbal reflections (verbal RL)
+  measureLift,        // measure a pattern's score-lift vs single-shot baseline
+  verifiedRatchet,    // advance loop state ONLY on a confident verifier pass
+  stepCountIs, verifierSatisfied, anyOf, allOf, // verifier-in-the-loop stop predicates
+  runImprovementCycle,
+  compactHistory,     // summarize-and-continue: run far past the context window
+  runUntil,           // bounded, checkpointable long-horizon driver (run soo long)
+} from "@vextlabs/theron-agent-sdk";
+
+const { answer, consistency } = await selfConsistency({
+  samples: 5,
+  generate: (i) => model.complete(prompt, { seed: i }),
+});
+```
+
+See [`examples/reasoning-patterns.ts`](examples/reasoning-patterns.ts) for all
+five run end-to-end (offline, no API key).
+
 ## How this compares
 
-| | Theron Agent SDK | Hermes-Agent | Claude Agent SDK | Google ADK | LangGraph |
+| | JUWEL Agent SDK | Hermes-Agent | Claude Agent SDK | Google ADK | LangGraph |
 |---|---|---|---|---|---|
 | License | **MIT** | MIT | Apache 2.0 | Apache 2.0 | MIT |
 | Multi-agent / Council | **First-class primitive with reconciler** | Sub-agents | Sub-agents | Multi-agent patterns | Supervisor / swarm |
@@ -132,7 +166,7 @@ Every kernel runs in milliseconds. Pure regex / arithmetic / hash-equal. **No ad
 | Tool typing | **Zod schemas, validated I/O** | Function decorators | Pydantic schemas | Pydantic | Pydantic |
 | Model-agnostic | **Yes — any OpenAI-compatible endpoint** | Yes — 200+ via OpenRouter | Claude-optimized | Gemini-optimized | Yes |
 | Signed integrations | **Stoa cap protocol (ES256 receipts + Merkle anchor)** | MCP (no integrity) | MCP | MCP | Custom |
-| Managed substrate path | [Vext Theron — 15-specialist Council + per-tenant LoRA tuning](https://theron.tryvext.com) | Nous Portal | Anthropic API | Vertex AI | LangGraph Cloud |
+| Managed substrate path | [Vext JUWEL — 15-specialist Council + per-tenant LoRA tuning](https://theron.tryvext.com) | Nous Portal | Anthropic API | Vertex AI | LangGraph Cloud |
 
 We're not trying to beat Hermes-Agent on community size or Claude Agent SDK on Claude-specific polish. We're shipping the three primitives nobody else ships first-class: **Council + Verifier kernels + Signed integrations.** Plus the optional managed substrate where you get our trained specialists.
 
@@ -171,22 +205,28 @@ runner.on(async (event) => {
 Every receipt has a deterministic `content_hash` (sorted-key SHA-256). Provide
 a `ReceiptSigner` to attach an ES256 / Ed25519 / HMAC detached signature.
 
-## Three sample agents
+## Runnable examples
 
-The SDK ships with three runnable sample agents in `examples/`. None require
-external network credentials — every tool is mocked so the agents run offline
-against any OpenRouter-compatible model.
+The SDK ships with runnable examples in `examples/`. None require external
+network credentials — the agent examples mock every tool so they run offline
+against any OpenRouter-compatible model, and the pattern/loop examples are fully
+offline (no key at all).
 
 | Example | What it shows |
 |---|---|
 | `cyber-recon-bot.ts` | Multi-tool recon chain (subdomains → ports → TLS → tech). Every tool call emits a receipt. |
 | `meeting-prep-bot.ts` | Calendar + docs + memory composition; produces a one-page meeting brief. |
 | `support-triage-bot.ts` | Three-specialist Council (classifier + retriever + writer); routing decision emitted as a signable receipt. |
+| `reasoning-patterns.ts` | All five reasoning patterns end-to-end (self-consistency, best-of-N, self-refine, tree-of-thoughts, chain-of-verification). **No key — fully offline.** |
+| `loop-primitives.ts` | Verified ratchet, `runImprovementCycle`, and verifier-in-the-loop stop predicates. **No key — fully offline.** |
 
 ```sh
 OPENROUTER_API_KEY=sk-or-... npm run example:cyber
 OPENROUTER_API_KEY=sk-or-... npm run example:meeting
 OPENROUTER_API_KEY=sk-or-... npm run example:support
+# offline, no key needed:
+npx tsx examples/reasoning-patterns.ts
+npx tsx examples/loop-primitives.ts
 ```
 
 ## What this SDK is NOT
@@ -197,7 +237,7 @@ This package is the framework. It is intentionally NOT:
 - A pre-built agent fleet — there are 3 sample agents in `examples/` to show you how to build, then you build your own
 - A hosted runtime — run it on your own infra (Node, Bun, Deno, serverless, container)
 
-If you want the trained 15-specialist Council, the 450+ curated industry-pack worker agents, the auto-improving Meta agents, or per-tenant overnight LoRA tuning — that's [Vext's managed Theron](https://theron.tryvext.com). The SDK is free; the substrate is the product.
+If you want the trained 15-specialist Council, the 450+ curated industry-pack worker agents, the auto-improving Meta agents, or per-tenant overnight LoRA tuning — that's [Vext's managed JUWEL](https://theron.tryvext.com). The SDK is free; the substrate is the product.
 
 ## Documentation
 
@@ -209,7 +249,7 @@ If you want the trained 15-specialist Council, the 450+ curated industry-pack wo
 
 ## More from Vext Labs
 
-The SDK is one corner of a larger surface. The full picture lives on the Vext Labs organization page: [github.com/Vext-Labs-Inc](https://github.com/Vext-Labs-Inc). Theron the product is at [theron.tryvext.com](https://theron.tryvext.com).
+The SDK is one corner of a larger surface. The full picture lives on the Vext Labs organization page: [github.com/Vext-Labs-Inc](https://github.com/Vext-Labs-Inc). JUWEL the product is at [theron.tryvext.com](https://theron.tryvext.com).
 
 ## Contributing
 

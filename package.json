@@ -1,6 +1,6 @@
 {
   "name": "@vextlabs/theron-agent-sdk",
-  "version": "0.1.0",
+  "version": "0.4.1",
   "description": "Open-source agent SDK with a Council of specialists, deterministic verifier kernels, and Stoa-signed integrations. Build any agent against any model. From Vext Labs.",
   "license": "MIT",
   "homepage": "https://tryvext.com/adk",
@@ -83,6 +83,21 @@
       "types": "./dist/receipts/index.d.ts",
       "import": "./dist/receipts/index.js",
       "require": "./dist/receipts/index.cjs"
+    },
+    "./adapters/theron": {
+      "types": "./dist/adapters/theron.d.ts",
+      "import": "./dist/adapters/theron.js",
+      "require": "./dist/adapters/theron.cjs"
+    },
+    "./loop": {
+      "types": "./dist/loop/index.d.ts",
+      "import": "./dist/loop/index.js",
+      "require": "./dist/loop/index.cjs"
+    },
+    "./patterns": {
+      "types": "./dist/patterns/index.d.ts",
+      "import": "./dist/patterns/index.js",
+      "require": "./dist/patterns/index.cjs"
     }
   },
   "files": [
@@ -106,6 +121,8 @@
     "example:cyber": "tsx examples/cyber-recon-bot.ts",
     "example:meeting": "tsx examples/meeting-prep-bot.ts",
     "example:support": "tsx examples/support-triage-bot.ts",
+    "example:patterns": "tsx examples/reasoning-patterns.ts",
+    "example:loops": "tsx examples/loop-primitives.ts",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

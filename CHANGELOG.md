@@ -3,6 +3,38 @@
 All notable changes to `@vextlabs/theron-agent-sdk` are documented here.
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.3.2] - 2026-06-27
+
+### Added
+- **Agent authoring primitives** — `serializeMarkdownAgent()` (the inverse of `parseMarkdownAgent`, so a host can let an agent write its own `.theron/agents/<name>.md`), `slugifyAgentName()`, `resolveAgentModel()`, and the `AGENT_MODEL_TIERS` fleet map (`fast`→fugu, `deep`→fugu-ultra, `reasoning`→a CoT specialist) — the single source of truth for subagent model routing.
+- **Extended tool contract** — `Task` now carries an `agent_type` parameter (named subagent personas), and a new canonical `AgentCreate` schema lets a surface expose runtime agent authoring. `AgentCreate` is registered in `MUTATING_EXTENDED_TOOLS` (it writes a file).
+
+## [0.3.1] - 2026-06-26
+
+### Added
+- **Sub-agent delegation actually executes.** A supervisor `Agent` with `sub_agents` now exposes one `delegate_to_<name>` tool per sub-agent (via `toolSchemas()`), and the `Runner` routes those calls back into `runner.run(subAgent, task)`, threading the abort signal — hierarchical multi-agent graphs work end-to-end instead of `sub_agents` being a silent no-op. New export `subAgentToolName`.
+- **On-disk SKILL.md loader** — `parseMarkdownSkill` / `loadMarkdownSkills` / `loadAllMarkdownSkills` (+ `MarkdownSkill` type) load user/project skills from `~/.theron/skills/*.md` and `<project>/.theron/skills/*.md` (also `<name>/SKILL.md` dirs), with project-local overriding global. Mirrors the markdown-agent loader; consumed by both the CLI and VS Code surfaces.
+- **`AbortSignal` cancellation** — `Runner.run`/`runCouncil` accept `{ signal }` (new `RunOptions`); the loop checks it each turn and emits an `aborted` event; `ModelAdapter.chat` gains an optional `signal` to forward to `fetch`.
+- **Cost accounting** — `ModelAdapter.chat` may return `cost_usd`; the Runner sums it into `AgentResult.cost_usd`, so `costUsdAtLeast` and budget-stop now work.
+- **`max_turns_exhausted` event** — emitted when the loop runs out of turns without a final answer (instead of silently returning `""`).
+- **Council `claimExtractor`** — opt-in extractor (e.g. exported `sentenceClaimExtractor`) so the deterministic reconciler can ratify cross-specialist claims; default behavior unchanged.
+- **`compactHistory({ summaryRole })`** — attach the summary under `user` instead of `system` for providers that reject a second system message.
+
+### Changed
+- **Parallel tool dispatch.** Multiple tool calls in a single turn now execute concurrently (`Promise.all`) with results appended in call order — turn latency drops from sum-of-tools to slowest-tool.
+- **Robust Zod → JSON Schema.** The converter now handles unions, literals, records, nullables, defaults, enums, and `.describe()` annotations (and excludes default-valued fields from `required`) instead of silently emitting `{type:"string"}`.
+- **MCP single-flight init.** Concurrent `listTools`/`callTool` callers share one in-flight `initialize` handshake (no duplicate sessions); a failed init is retryable.
+
+## [0.3.0] - 2026-06-13
+
+### Added
+- **`patterns`** primitives — framework-agnostic, verifier/score-gated reasoning patterns no public agent SDK ships as first-class composables: `selfConsistency` (sample N paths → majority answer + agreement ratio), `bestOfN` (verifier-guided best-of-N), `selfRefine` (draft → critique → revise, early-exit when clean), `treeOfThoughts` (best-first branch/score/expand search), `chainOfVerification` (draft → verify claims independently → revise; hallucination reduction), `mixtureOfAgents` (layered multi-agent propose → refine-seeing-peers → aggregate), `reflexion` (retry with accumulated verbal reflections; learns from outcome feedback, not just output quality). Provider-agnostic (take async `generate`/`score`/`verify`/`critique` fns); pure, deterministic, zero-network. The SDK-side counterparts of Theron's server Hive loops.
+- **`measureLift`** — measure a pattern/loop's score lift + win-rate over a single-shot baseline on a task set. The empirical backbone for proving the harness beats raw single-shot ("the system is the moat") rather than asserting it. Pure; no benchmark framework required.
+- **`loop`** primitives: `verifiedRatchet` (advance only on a confident verifier pass), verifier-in-the-loop `stopWhen` predicates (`stepCountIs`/`costUsdAtLeast`/`verifierSatisfied`/`anyOf`/`allOf`), `runImprovementCycle`.
+- **Long-horizon primitives** — `compactHistory` (summarize-and-continue: fold older messages into a summary, keep recent verbatim, so a conversation/loop runs far past the context window), `runUntil` (a bounded, checkpointable long-horizon driver: run `step` until a predicate holds or `maxSteps`, with an `onCheckpoint` hook for durable resume), and `boundWorkingSet` (keep a long agent's working memory bounded by importance + recency; pinned items never evicted). Provider-agnostic + pure. The "run soo long, hold soo much context" kit.
+
 ## [0.1.0] - 2026-05-23
 
 First stable npm release. The five primitives and the runtime ship under the

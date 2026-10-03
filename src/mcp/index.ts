@@ -12,9 +12,7 @@
 // JSON-RPC envelopes. It hands the resulting tool catalog to the Runner via
 // `asTools()`, where it becomes a normal Tool[] the LLM can call.
 //
-// The Theron-Cloud equivalent lives in marketing/api/_lib/mcp.ts and supplies
-// per-user MCP connections via KV storage. Both implementations speak the same
-// wire protocol; this one ships open-core so SDK users can plug arbitrary MCP
+// This client speaks the MCP wire protocol so SDK users can plug arbitrary MCP
 // servers into their own agents.
 
 import type { Tool, ToolContext, ToolSchema } from "../tools/index.js";
@@ -43,7 +41,7 @@ export interface McpTool {
 
 interface JsonRpcRequest {
   jsonrpc: "2.0";
-  id: number | string;
+  id?: number | string;
   method: string;
   params?: unknown;
 }
@@ -71,7 +69,7 @@ interface JsonRpcResponse {
  */
 export class MCPClient {
   readonly config: McpServerConfig;
-  private initialized = false;
+  private initPromise: Promise<void> | null = null;
   private toolCache: McpTool[] | null = null;
 
   constructor(config: McpServerConfig) {
@@ -158,7 +156,18 @@ export class MCPClient {
   }
 
   private async ensureInitialized(signal?: AbortSignal): Promise<void> {
-    if (this.initialized) return;
+    if (!this.initPromise) {
+      this.initPromise = this.doInitialize(signal);
+    }
+    try {
+      await this.initPromise;
+    } catch (err) {
+      this.initPromise = null;
+      throw err;
+    }
+  }
+
+  private async doInitialize(signal?: AbortSignal): Promise<void> {
     await this.rpc(
       "initialize",
       {
@@ -170,7 +179,6 @@ export class MCPClient {
     );
     // notifications/initialized is fire-and-forget per spec.
     this.rpc("notifications/initialized", {}, signal).catch(() => undefined);
-    this.initialized = true;
   }
 
   private async rpc(
@@ -189,9 +197,11 @@ export class MCPClient {
     }
     const body: JsonRpcRequest = {
       jsonrpc: "2.0",
-      id: Date.now() + Math.floor(Math.random() * 1000),
       method,
       params,
+      ...(method.startsWith("notifications/")
+        ? {}
+        : { id: Date.now() + Math.floor(Math.random() * 1000) }),
     };
     try {
       const r = await fetch(this.config.url, {
@@ -216,11 +226,24 @@ export class MCPClient {
       const ct = r.headers.get("content-type") || "";
       if (ct.includes("text/event-stream")) {
         const text = await r.text();
-        const m = text.match(/data:\s*(\{[\s\S]*?\})\s*\n/);
-        if (!m) throw new Error("mcp sse stream had no data event");
-        const env = JSON.parse(m[1]) as JsonRpcResponse;
-        if (env.error) throw new Error(`mcp error: ${env.error.message}`);
-        return env.result;
+        for (const ev of text.split(/\n\n/)) {
+          const payload = ev
+            .split(/\r?\n/)
+            .filter((l) => l.startsWith("data:"))
+            .map((l) => l.slice(5).replace(/^ /, ""))
+            .join("\n")
+            .trim();
+          if (!payload || payload === "[DONE]") continue;
+          let env2: JsonRpcResponse;
+          try {
+            env2 = JSON.parse(payload) as JsonRpcResponse;
+          } catch {
+            continue;
+          }
+          if (env2.error) throw new Error(`mcp error: ${env2.error.message}`);
+          return env2.result;
+        }
+        throw new Error("mcp sse stream had no data event");
       }
       const env = (await r.json()) as JsonRpcResponse;
       if (env.error) throw new Error(`mcp error: ${env.error.message}`);
