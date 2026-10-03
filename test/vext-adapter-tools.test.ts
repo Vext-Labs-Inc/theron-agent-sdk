@@ -232,3 +232,73 @@ describe("tool calls against a strict OpenAI-style server", () => {
     expect(toolIds).toEqual(["call_0_0", "call_0_1"]);
   });
 });
+
+describe("vext adapter request shape", () => {
+  it.each([
+    ["https://x.example/openai/v1?api-version=2024-10-21", "/openai/v1/chat/completions?api-version=2024-10-21"],
+    ["https://x.example/openai/v1/?api-version=2024-10-21", "/openai/v1/chat/completions?api-version=2024-10-21"],
+    ["https://x.example/v1#frag", "/v1/chat/completions#frag"],
+    ["https://x.example?api-version=1", "/chat/completions?api-version=1"],
+  ])("joins %s on the path and keeps the query and fragment", async (base, suffix) => {
+    const savedFetch = globalThis.fetch;
+    const urls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      urls.push(String(input));
+      return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      await createVextAdapter({ baseURL: base }).chat({ model: "m", messages: [{ role: "user", content: "hi" }] });
+    } finally {
+      globalThis.fetch = savedFetch;
+    }
+    expect(urls).toEqual([`https://x.example${suffix}`]);
+  });
+
+  it("keeps the query on a real request to a local server", async () => {
+    const srv = await strictServer();
+    try {
+      await createVextAdapter({ baseURL: `${srv.origin}/openai/v1?api-version=2024-10-21` }).chat({
+        model: "m",
+        messages: [{ role: "user", content: "hi" }],
+      });
+      expect(srv.urls).toEqual(["/openai/v1/chat/completions?api-version=2024-10-21"]);
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it("sends stream_options.include_usage only when streaming", async () => {
+    const srv = await strictServer();
+    try {
+      const adapter = createVextAdapter({ baseURL: srv.origin });
+      const streamed = await adapter.chat({ model: "m", messages: [{ role: "user", content: "hi" }], onDelta: () => {} });
+      await adapter.chat({ model: "m", messages: [{ role: "user", content: "hi" }] });
+      expect(srv.bodies[0].stream).toBe(true);
+      expect(srv.bodies[0].stream_options).toEqual({ include_usage: true });
+      expect(streamed.tokens).toEqual({ input: 10, output: 4 });
+      expect(streamed.tool_calls?.[0]?.id).toBe(CALL_ID);
+      expect(srv.bodies[1].stream).toBe(false);
+      expect(srv.bodies[1]).not.toHaveProperty("stream_options");
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it("omits max_tokens and temperature unless the caller sets them", async () => {
+    const srv = await strictServer();
+    try {
+      const adapter = createVextAdapter({ baseURL: srv.origin });
+      await adapter.chat({ model: "m", messages: [{ role: "user", content: "hi" }] });
+      await adapter.chat({ model: "m", messages: [{ role: "user", content: "hi" }], max_tokens: 64, temperature: 0 });
+      expect(srv.bodies[0]).not.toHaveProperty("max_tokens");
+      expect(srv.bodies[0]).not.toHaveProperty("temperature");
+      expect(srv.bodies[1].max_tokens).toBe(64);
+      expect(srv.bodies[1].temperature).toBe(0);
+    } finally {
+      await srv.close();
+    }
+  });
+});

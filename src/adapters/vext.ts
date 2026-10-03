@@ -2,7 +2,10 @@
  * Vext model adapter.
  *
  * `baseURL` is the OpenAI-style API root. `chat` POSTs to
- * `<baseURL>/chat/completions` after stripping trailing slashes.
+ * `<baseURL>/chat/completions` after stripping trailing slashes from the path.
+ * A `?query` or `#fragment` on the base is kept after the appended path, so
+ * `https://x.example/openai/v1?api-version=1` posts to
+ * `https://x.example/openai/v1/chat/completions?api-version=1`.
  * `https://api.openai.com/v1` posts to `https://api.openai.com/v1/chat/completions`.
  * An Ollama server uses `http://127.0.0.1:11434/v1`, which posts to
  * `http://127.0.0.1:11434/v1/chat/completions`.
@@ -26,6 +29,9 @@
  *   });
  *
  * `model` is required. `council_mode` is sent only when `councilMode` is set.
+ * `max_tokens` and `temperature` are sent only when passed to `chat`; there are
+ * no SDK defaults, so the server's defaults apply. Streaming requests also send
+ * `stream_options: { include_usage: true }` so token usage is reported.
  *
  * Tool calls keep the upstream `id` from both streamed and non-streamed
  * responses. Assistant turns are sent back with their `tool_calls`, and each
@@ -64,7 +70,19 @@ function resolveBase(opts: VextAdapterOptions): string {
     configured(readEnv("VEXT_BASE_URL")) ??
     configured(readEnv("THERON_BASE_URL"));
   if (!explicit) throw new MissingBaseURLError();
-  return explicit.replace(/\/+$/, "");
+  return explicit;
+}
+
+/**
+ * Append `/chat/completions` to the base's path, keeping any `?query` or
+ * `#fragment` (for example Azure's `?api-version=`) after it. Done on the raw
+ * string rather than through `URL` so the caller's spelling is sent as given.
+ */
+function chatCompletionsURL(base: string): string {
+  const cut = base.search(/[?#]/);
+  const head = cut === -1 ? base : base.slice(0, cut);
+  const tail = cut === -1 ? "" : base.slice(cut);
+  return `${head.replace(/\/+$/, "")}/chat/completions${tail}`;
 }
 
 type WireMessage =
@@ -100,7 +118,8 @@ export type VextAdapter = ModelAdapter;
 export interface VextAdapterOptions {
   /**
    * OpenAI-style API root. `chat` POSTs to `<baseURL>/chat/completions`
-   * (trailing slashes are stripped first).
+   * (trailing slashes on the path are stripped first; a `?query` or
+   * `#fragment` is kept after the appended path).
    * `https://api.openai.com/v1` becomes `https://api.openai.com/v1/chat/completions`.
    * `http://127.0.0.1:11434/v1` becomes `http://127.0.0.1:11434/v1/chat/completions`.
    * Required unless `VEXT_BASE_URL` or the deprecated `THERON_BASE_URL` is set.
@@ -144,16 +163,19 @@ export function createVextAdapter(opts: VextAdapterOptions = {}): VextAdapter {
       if (typeof model !== "string" || model.trim() === "") {
         throw new Error(MISSING_MODEL_MESSAGE);
       }
-      const url = `${base}/chat/completions`;
+      const url = chatCompletionsURL(base);
       const tokenProvider = opts.tokenProvider;
 
+      // max_tokens and temperature are sent only when the caller sets them,
+      // so the server's own defaults apply otherwise.
       const body: Record<string, unknown> = {
         model,
         messages: toWire(messages),
-        max_tokens: max_tokens ?? 2048,
-        temperature: temperature ?? 0.2,
         stream: !!onDelta,
       };
+      if (onDelta) body.stream_options = { include_usage: true };
+      if (max_tokens !== undefined) body.max_tokens = max_tokens;
+      if (temperature !== undefined) body.temperature = temperature;
       if (opts.councilMode) body.council_mode = opts.councilMode;
       if (tools && tools.length > 0) {
         body.tools = tools.map((t) => ({
