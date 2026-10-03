@@ -1,9 +1,32 @@
-import { execFile } from "child_process";
-import { randomUUID } from "crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
-import { tmpdir } from "os";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "path";
-import { promisify } from "util";
+// CloudSession — the seam behind "Theron on the web" / cloud routines: an
+// isolated, per-session execution environment with a filesystem, where tools
+// run server-side instead of on the user's machine.
+//
+// A PRODUCTION implementation is backed by a provisioned cloud VM or sandbox
+// (E2B, Firecracker microVM, a RunPod pod, a Modal sandbox, …). Those cost real
+// money per running session and need infra stood up — they are deliberately NOT
+// implemented here. What IS here is:
+//   - the provider-agnostic CloudSession / CloudSessionProvider contract, and
+//   - LocalCloudSession, an in-process backend (a temp workspace + child_process)
+//     for tests, CI, and local development that satisfies the same contract.
+//
+// SECURITY: LocalCloudSession runs on the HOST machine and is NOT a security
+// boundary — it is for development/testing only. Real isolation (one tenant
+// cannot see another, the host is protected) is the job of the cloud-VM backend.
+// Do not route untrusted multi-tenant traffic through LocalCloudSession.
+
+import {
+  mkdtemp,
+  rm,
+  readFile as fsReadFile,
+  writeFile as fsWriteFile,
+  mkdir,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, isAbsolute, resolve, relative, dirname, sep } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { randomUUID } from "node:crypto";
 
 const pExecFile = promisify(execFile);
 
@@ -26,9 +49,10 @@ export interface CloudExecOptions {
 /**
  * An isolated, per-session execution environment with a filesystem.
  *
- * Lifecycle: a CloudSessionProvider hands back a live session from
- * `provision()`; call `dispose()` to release it. All file paths are resolved
- * INSIDE the session root; a path that escapes the root is rejected.
+ * Lifecycle: a {@link CloudSessionProvider} hands back a live session from
+ * `provision()`; call `dispose()` to release it (tear down the VM / delete the
+ * workspace). All file paths are resolved INSIDE the session root; a path that
+ * escapes the root is rejected.
  */
 export interface CloudSession {
   /** Stable id, for receipts and logs. */
@@ -50,9 +74,12 @@ export interface CloudSessionProvider {
   provision(): Promise<CloudSession>;
 }
 
+/** Resolve `p` inside `root`, rejecting any path that escapes the root. */
 function resolveInside(root: string, p: string): string {
   const abs = isAbsolute(p) ? p : resolve(root, p);
   const rel = relative(root, abs);
+  // Escape iff rel is exactly ".." or a "../"-prefixed path (not just a name
+  // that happens to start with ".."), or an absolute path on another root.
   if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
     throw new Error(`path escapes session root: ${p}`);
   }
@@ -60,8 +87,8 @@ function resolveInside(root: string, p: string): string {
 }
 
 /**
- * In-process CloudSession backend: a temp workspace on the host, commands
- * via `/bin/sh -c`. For tests and local dev only — not a security boundary.
+ * In-process {@link CloudSession} backend: a temp workspace on the host, commands
+ * via `/bin/sh -c`. For tests/CI/local dev only — NOT a security boundary.
  */
 export class LocalCloudSession implements CloudSession {
   readonly id: string;
@@ -84,14 +111,10 @@ export class LocalCloudSession implements CloudSession {
         maxBuffer: 64 * 1024 * 1024,
       });
       return { stdout: stdout.toString(), stderr: stderr.toString(), exitCode: 0 };
-    } catch (e) {
-      const err = e as NodeJS.ErrnoException & {
-        stdout?: string | Buffer;
-        stderr?: string | Buffer;
-        killed?: boolean;
-        code?: number | string;
-      };
-      const exitCode = typeof err.code === "number" ? err.code : err.killed ? 124 : 1;
+    } catch (e: unknown) {
+      const err = e as { stdout?: string; stderr?: string; message?: string; code?: unknown; killed?: boolean };
+      const exitCode =
+        typeof err.code === "number" ? err.code : err.killed ? 124 : 1;
       return {
         stdout: (err.stdout ?? "").toString(),
         stderr: (err.stderr ?? err.message ?? String(e)).toString(),
@@ -102,14 +125,14 @@ export class LocalCloudSession implements CloudSession {
 
   async readFile(path: string): Promise<string> {
     if (this.disposed) throw new Error("session disposed");
-    return readFile(resolveInside(this.root, path), "utf8");
+    return fsReadFile(resolveInside(this.root, path), "utf8");
   }
 
   async writeFile(path: string, content: string): Promise<void> {
     if (this.disposed) throw new Error("session disposed");
     const abs = resolveInside(this.root, path);
     await mkdir(dirname(abs), { recursive: true });
-    await writeFile(abs, content, "utf8");
+    await fsWriteFile(abs, content, "utf8");
   }
 
   async dispose(): Promise<void> {
@@ -119,7 +142,7 @@ export class LocalCloudSession implements CloudSession {
   }
 }
 
-/** Provisions LocalCloudSessions in fresh OS temp dirs. */
+/** Provisions {@link LocalCloudSession}s in fresh OS temp dirs. */
 export class LocalCloudSessionProvider implements CloudSessionProvider {
   async provision(): Promise<CloudSession> {
     const id = randomUUID();

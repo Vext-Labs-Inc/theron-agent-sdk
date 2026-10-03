@@ -41,7 +41,7 @@ export interface McpTool {
 
 interface JsonRpcRequest {
   jsonrpc: "2.0";
-  id?: number | string;
+  id: number | string;
   method: string;
   params?: unknown;
 }
@@ -69,7 +69,7 @@ interface JsonRpcResponse {
  */
 export class MCPClient {
   readonly config: McpServerConfig;
-  private initPromise: Promise<void> | null = null;
+  private initialized = false;
   private toolCache: McpTool[] | null = null;
 
   constructor(config: McpServerConfig) {
@@ -156,18 +156,7 @@ export class MCPClient {
   }
 
   private async ensureInitialized(signal?: AbortSignal): Promise<void> {
-    if (!this.initPromise) {
-      this.initPromise = this.doInitialize(signal);
-    }
-    try {
-      await this.initPromise;
-    } catch (err) {
-      this.initPromise = null;
-      throw err;
-    }
-  }
-
-  private async doInitialize(signal?: AbortSignal): Promise<void> {
+    if (this.initialized) return;
     await this.rpc(
       "initialize",
       {
@@ -179,6 +168,7 @@ export class MCPClient {
     );
     // notifications/initialized is fire-and-forget per spec.
     this.rpc("notifications/initialized", {}, signal).catch(() => undefined);
+    this.initialized = true;
   }
 
   private async rpc(
@@ -195,14 +185,14 @@ export class MCPClient {
       if (externalSignal.aborted) ac.abort();
       else externalSignal.addEventListener("abort", () => ac.abort());
     }
+    // JSON-RPC notifications (notifications/*) MUST NOT carry an id, or spec-strict MCP servers reject
+    // the whole session. Only requests get an id.
     const body: JsonRpcRequest = {
       jsonrpc: "2.0",
       method,
       params,
-      ...(method.startsWith("notifications/")
-        ? {}
-        : { id: Date.now() + Math.floor(Math.random() * 1000) }),
-    };
+      ...(method.startsWith("notifications/") ? {} : { id: Date.now() + Math.floor(Math.random() * 1000) }),
+    } as JsonRpcRequest;
     try {
       const r = await fetch(this.config.url, {
         method: "POST",
@@ -226,6 +216,9 @@ export class MCPClient {
       const ct = r.headers.get("content-type") || "";
       if (ct.includes("text/event-stream")) {
         const text = await r.text();
+        // Robust SSE parse (the old regex was non-greedy — it truncated nested JSON at the first `}` —
+        // and required a trailing `\n`, so it missed the last event). Parse each event's `data:` payload
+        // as full JSON and return the first JSON-RPC response.
         for (const ev of text.split(/\n\n/)) {
           const payload = ev
             .split(/\r?\n/)
@@ -234,14 +227,14 @@ export class MCPClient {
             .join("\n")
             .trim();
           if (!payload || payload === "[DONE]") continue;
-          let env2: JsonRpcResponse;
+          let env: JsonRpcResponse;
           try {
-            env2 = JSON.parse(payload) as JsonRpcResponse;
+            env = JSON.parse(payload) as JsonRpcResponse;
           } catch {
-            continue;
+            continue; // not a complete JSON event
           }
-          if (env2.error) throw new Error(`mcp error: ${env2.error.message}`);
-          return env2.result;
+          if (env.error) throw new Error(`mcp error: ${env.error.message}`);
+          return env.result;
         }
         throw new Error("mcp sse stream had no data event");
       }

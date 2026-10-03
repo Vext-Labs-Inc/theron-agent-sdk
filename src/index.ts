@@ -2,29 +2,26 @@
 //
 // The minimum import to build an agent:
 //   import { Agent, Council, Tool, Runner } from "@vextlabs/theron-agent-sdk";
+//
+// Five primitives + the runtime. Everything else is built on these.
 
+export { Agent, subAgentToolName } from "./agent/index.js";
+export type { AgentConfig, AgentInstruction, AgentResult, MarkdownAgentType } from "./agent/index.js";
+export { parseMarkdownAgent, loadMarkdownAgents, loadAllMarkdownAgents } from "./agent/index.js";
+// Agent authoring + model-fleet routing — let an agent create its own agents.
 export {
-  AGENT_MODEL_TIERS,
-  Agent,
-  loadAllMarkdownAgents,
-  loadMarkdownAgents,
-  parseMarkdownAgent,
-  resolveAgentModel,
   serializeMarkdownAgent,
   slugifyAgentName,
-  subAgentToolName,
+  resolveAgentModel,
+  AGENT_MODEL_TIERS,
 } from "./agent/index.js";
-export type {
-  AgentConfig,
-  AgentDefinitionInput,
-  AgentInstruction,
-  AgentModelTier,
-  AgentResult,
-  MarkdownAgentType,
-} from "./agent/index.js";
+export type { AgentDefinitionInput, AgentModelTier } from "./agent/index.js";
+
+export { parseMarkdownSkill, loadMarkdownSkills, loadAllMarkdownSkills } from "./skills/index.js";
+export type { MarkdownSkill } from "./skills/index.js";
 
 export { Council, sentenceClaimExtractor } from "./council/index.js";
-export type { ClaimExtractor, CouncilConfig, CouncilOutput, Reconciler } from "./council/index.js";
+export type { CouncilConfig, CouncilOutput, Reconciler, ClaimExtractor } from "./council/index.js";
 
 export { Session } from "./session/index.js";
 export type { SessionEvent, SessionConfig } from "./session/index.js";
@@ -36,26 +33,65 @@ export { defineTool } from "./tools/index.js";
 export type { Tool, ToolContext, ToolSchema } from "./tools/index.js";
 export { zod } from "./tools/index.js";
 
+export { LOCAL_TOOL_PARAMETERS, LOCAL_TOOL_NAMES, MUTATING_LOCAL_TOOLS, buildLocalToolSchemas } from "./tools/local-contract.js";
+export {
+  EXTENDED_TOOL_PARAMETERS,
+  EXTENDED_TOOL_DESCRIPTIONS,
+  MUTATING_EXTENDED_TOOLS,
+  buildExtendedToolSchemas,
+} from "./tools/extended-contract.js";
+export type { LocalToolDef } from "./tools/local-contract.js";
+
 export { defineVerifier, VerifierKernels } from "./verifiers/index.js";
 export type { Verifier, VerifierResult, VerifierIssue } from "./verifiers/index.js";
 
-export { Runner, LocalCloudSession, LocalCloudSessionProvider } from "./runtime/index.js";
+// Reasoning Certificate — sound, offline-verifiable proof that a CLAIM is correct
+// (not just that an action happened), sealed into the receipt's content_hash.
+export { certifyArithmetic, verifyReasoningCertificate } from "./reasoning-cert/index.js";
+export type { ReasoningCertificate, ReasoningTier } from "./reasoning-cert/index.js";
+
+// Composer contract — the single source of truth for slash/at token handling
+// (mid-message detection, cursor-aware replace, skill rewrite, pills) so the
+// VS Code/CLI/OS composers stop reimplementing it and growing the same bugs.
+export {
+  findToken,
+  replaceToken,
+  insertSigil,
+  filterPalette,
+  rewriteSkills,
+  isDestructive,
+  DESTRUCTIVE_SLASH,
+} from "./composer/index.js";
 export type {
-  ModelAdapter,
-  RunnerEvent,
-  RunnerConfig,
-  RunOptions,
-  CloudExecOptions,
-  CloudExecResult,
+  Sigil,
+  ComposerToken,
+  PaletteItem,
+  ComposerPill,
+  SkillLike,
+  SkillRewrite,
+} from "./composer/index.js";
+
+export { Runner } from "./runtime/index.js";
+export type { ModelAdapter, RunnerEvent, RunnerConfig, RunOptions } from "./runtime/index.js";
+
+export { LocalCloudSession, LocalCloudSessionProvider } from "./runtime/cloud-session.js";
+export type {
   CloudSession,
   CloudSessionProvider,
-} from "./runtime/index.js";
+  CloudExecResult,
+  CloudExecOptions,
+} from "./runtime/cloud-session.js";
 
 export { MCPClient, collectMcpTools } from "./mcp/index.js";
 export type { McpServerConfig, McpTool } from "./mcp/index.js";
 
-export { resolveJuwelToken, theron, theronAdapter } from "./adapters/theron.js";
+// First-class Theron adapter — drives the Vext-hosted council so agents built
+// with this SDK run on Theron's substrate out of the box. Alias: `theron`.
+export { theronAdapter, theron } from "./adapters/theron.js";
 export type { TheronAdapterOptions } from "./adapters/theron.js";
+// JUWEL account token provider — one sign-in (`juwel login`) authenticates the
+// SDK via ~/.juwel/config.json / JUWEL_TOKEN, no BYO key required.
+export { resolveJuwelToken } from "./adapters/juwel_auth.js";
 
 export {
   ReceiptEmitter,
@@ -72,105 +108,61 @@ export type {
 } from "./receipts/index.js";
 
 export {
-  allOf,
-  anyOf,
-  boundWorkingSet,
-  compactHistory,
-  costUsdAtLeast,
-  runImprovementCycle,
-  runUntil,
   stepCountIs,
-  verifiedRatchet,
+  costUsdAtLeast,
   verifierSatisfied,
+  anyOf,
+  allOf,
+  verifiedRatchet,
+  runImprovementCycle,
+  compactHistory,
+  runUntil,
+  boundWorkingSet,
 } from "./loop/index.js";
 export type {
-  BoundWorkingSetResult,
+  LoopState,
+  StopPredicate,
+  RatchetVerdict,
+  RatchetDecision,
+  Ratchet,
+  ImprovementCycleSpec,
+  ImprovementResult,
   ChatMessage,
   CompactHistoryOptions,
   CompactHistoryResult,
-  ImprovementCycleSpec,
-  ImprovementResult,
-  LoopState,
-  Ratchet,
-  RatchetDecision,
-  RatchetVerdict,
   RunUntilOptions,
   RunUntilResult,
-  StopPredicate,
   WorkingItem,
+  BoundWorkingSetResult,
 } from "./loop/index.js";
 
 export {
-  bestOfN,
-  chainOfVerification,
-  measureLift,
-  mixtureOfAgents,
-  reflexion,
   selfConsistency,
+  bestOfN,
   selfRefine,
   treeOfThoughts,
+  chainOfVerification,
+  mixtureOfAgents,
+  reflexion,
+  measureLift,
 } from "./patterns/index.js";
 export type {
-  BestOfNOptions,
-  BestOfNResult,
-  ChainOfVerificationOptions,
-  ChainOfVerificationResult,
-  MeasureLiftOptions,
-  MeasureLiftResult,
-  MixtureOfAgentsOptions,
-  MixtureOfAgentsResult,
-  ReflexionOptions,
-  ReflexionResult,
   SelfConsistencyOptions,
   SelfConsistencyResult,
+  BestOfNOptions,
+  BestOfNResult,
   SelfRefineOptions,
   SelfRefineResult,
   TreeOfThoughtsOptions,
   TreeOfThoughtsResult,
+  ChainOfVerificationOptions,
+  ChainOfVerificationResult,
+  MixtureOfAgentsOptions,
+  MixtureOfAgentsResult,
+  ReflexionOptions,
+  ReflexionResult,
+  MeasureLiftOptions,
+  MeasureLiftResult,
 } from "./patterns/index.js";
 
-export {
-  parseMarkdownSkill,
-  loadMarkdownSkills,
-  loadAllMarkdownSkills,
-} from "./skills/index.js";
-export type { MarkdownSkill } from "./skills/index.js";
-
-export {
-  LOCAL_TOOL_PARAMETERS,
-  LOCAL_TOOL_NAMES,
-  MUTATING_LOCAL_TOOLS,
-  buildLocalToolSchemas,
-} from "./tools/local-contract.js";
-export type { LocalToolDef } from "./tools/local-contract.js";
-
-export {
-  EXTENDED_TOOL_PARAMETERS,
-  EXTENDED_TOOL_DESCRIPTIONS,
-  MUTATING_EXTENDED_TOOLS,
-  buildExtendedToolSchemas,
-} from "./tools/extended-contract.js";
-
-export { certifyArithmetic, verifyReasoningCertificate } from "./reasoning-cert/index.js";
-export type { ReasoningCertificate, ReasoningTier } from "./reasoning-cert/index.js";
-
-export {
-  findToken,
-  replaceToken,
-  insertSigil,
-  filterPalette,
-  rewriteSkills,
-  DESTRUCTIVE_SLASH,
-  isDestructive,
-} from "./composer/index.js";
-export type {
-  ComposerPill,
-  ComposerToken,
-  PaletteItem,
-  Sigil,
-  SkillLike,
-  SkillRewrite,
-} from "./composer/index.js";
-
-// Matches the constant shipped in the 0.4.1 bundle. package.json is 0.4.1.
 export const VERSION = "0.3.2";

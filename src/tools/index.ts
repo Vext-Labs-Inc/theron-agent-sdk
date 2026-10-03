@@ -83,57 +83,22 @@ export function defineTool<TSchema extends z.ZodTypeAny, TOutput>(opts: {
 // samples need. Production users can swap in `zod-to-json-schema` for full
 // coverage (enums, unions, discriminated unions, refinements, etc.).
 function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
-  const description = (schema as z.ZodTypeAny & { _def?: { description?: string } })._def?.description;
-  const withDesc = (s: Record<string, unknown>) => (description ? { ...s, description } : s);
-  if (schema instanceof z.ZodOptional) return zodToJsonSchema(schema.unwrap());
-  if (schema instanceof z.ZodDefault) {
-    const innerType = schema._def.innerType as z.ZodTypeAny;
-    const inner = zodToJsonSchema(innerType);
-    let def: unknown;
-    try {
-      def = schema._def.defaultValue?.();
-    } catch {
-      def = undefined;
-    }
-    return withDesc(def === undefined ? inner : { ...inner, default: def });
-  }
-  if (schema instanceof z.ZodNullable) {
-    return withDesc({ ...zodToJsonSchema(schema.unwrap()), nullable: true });
-  }
   if (schema instanceof z.ZodObject) {
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
     for (const [key, value] of Object.entries(schema.shape)) {
-      const field = value as z.ZodTypeAny;
-      properties[key] = zodToJsonSchema(field);
-      if (!(field instanceof z.ZodOptional) && !(field instanceof z.ZodDefault)) {
-        required.push(key);
-      }
+      properties[key] = zodToJsonSchema(value as z.ZodTypeAny);
+      if (!(value instanceof z.ZodOptional)) required.push(key);
     }
-    return withDesc({ type: "object", properties, ...(required.length > 0 ? { required } : {}) });
+    return { type: "object", properties, ...(required.length > 0 ? { required } : {}) };
   }
-  if (schema instanceof z.ZodString) return withDesc({ type: "string" });
-  if (schema instanceof z.ZodNumber) return withDesc({ type: "number" });
-  if (schema instanceof z.ZodBoolean) return withDesc({ type: "boolean" });
-  if (schema instanceof z.ZodArray) return withDesc({ type: "array", items: zodToJsonSchema(schema.element) });
-  if (schema instanceof z.ZodEnum) return withDesc({ type: "string", enum: schema.options });
-  if (schema instanceof z.ZodLiteral) {
-    const val = schema.value;
-    const t = typeof val === "number" ? "number" : typeof val === "boolean" ? "boolean" : "string";
-    return withDesc({ type: t, enum: [val] });
-  }
-  if (schema instanceof z.ZodUnion) {
-    const options = schema._def.options as z.ZodTypeAny[];
-    return withDesc({ anyOf: options.map((o) => zodToJsonSchema(o)) });
-  }
-  if (schema instanceof z.ZodRecord) {
-    const valueType = schema._def.valueType as z.ZodTypeAny | undefined;
-    return withDesc({
-      type: "object",
-      additionalProperties: valueType ? zodToJsonSchema(valueType) : true,
-    });
-  }
-  return withDesc({ type: "string" });
+  if (schema instanceof z.ZodString) return { type: "string" };
+  if (schema instanceof z.ZodNumber) return { type: "number" };
+  if (schema instanceof z.ZodBoolean) return { type: "boolean" };
+  if (schema instanceof z.ZodArray) return { type: "array", items: zodToJsonSchema(schema.element) };
+  if (schema instanceof z.ZodOptional) return zodToJsonSchema(schema.unwrap());
+  if (schema instanceof z.ZodEnum) return { type: "string", enum: schema.options };
+  return { type: "string" };
 }
 
 export { z as zod };

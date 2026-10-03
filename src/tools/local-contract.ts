@@ -1,4 +1,25 @@
-/** OpenAI-compatible function tool definition. */
+// Canonical shared contract for the LOCAL tool runtime (CLI + VS Code).
+//
+// Both packages/theron-cli and packages/theron-vscode define the same 7 local
+// tools (Read, Write, Edit, Bash, Glob, Grep, LS) with structurally identical
+// JSON-Schema `parameters`. The only divergences are surface-specific wording:
+// the tool-level prose `description` strings, the confirm-policy field name, and
+// a few inner property descriptions that name the runtime (CLI "cwd"/"repo" vs
+// VS Code "workspace"). Those inner descriptions are NEUTRALIZED here ("working
+// directory", "relative") so this contract is the canonical, surface-agnostic
+// truth both packages can converge onto without either regressing.
+//
+// This module is the single source of truth for the shared portion:
+//   - LOCAL_TOOL_PARAMETERS — the canonical parameters schemas (identical across surfaces)
+//   - LOCAL_TOOL_NAMES      — registry order
+//   - MUTATING_LOCAL_TOOLS  — which of the 7 tools can mutate state
+//   - buildLocalToolSchemas — combine per-surface descriptions with the shared schemas
+//
+// Descriptions and executors stay per-surface. Surfaces converge onto this by
+// importing LOCAL_TOOL_PARAMETERS / MUTATING_LOCAL_TOOLS rather than re-declaring
+// them locally.
+
+/** OpenAI-compatible function tool definition (same shape as Anthropic via the `tools` field). */
 export interface LocalToolDef {
   type: "function";
   function: {
@@ -11,8 +32,9 @@ export interface LocalToolDef {
 /**
  * Canonical JSON-Schema `parameters` objects for the 7 shared local tools.
  *
- * Descriptions of the tool itself stay per-surface. These parameters blocks
- * are the shared contract.
+ * These are copied verbatim from both theron-cli and theron-vscode (the
+ * parameters blocks are identical across those two packages). Do NOT add
+ * surface-specific prose here — descriptions live per-surface.
  */
 export const LOCAL_TOOL_PARAMETERS: Record<string, Record<string, unknown>> = {
   Read: {
@@ -62,20 +84,10 @@ export const LOCAL_TOOL_PARAMETERS: Record<string, Record<string, unknown>> = {
   Grep: {
     type: "object",
     properties: {
-      pattern: { type: "string", description: "Regex pattern (ripgrep syntax). Use fixed_strings for a literal search." },
+      pattern: { type: "string", description: "Regex pattern." },
       path: { type: "string", description: "Optional file or directory to limit the search." },
-      glob: { type: "string", description: "Optional glob filter, e.g. '*.ts' or 'src/**/*.tsx'." },
-      type: { type: "string", description: "Optional file-type filter (ripgrep --type), e.g. 'ts', 'py', 'rust'. More efficient than glob for language filters." },
-      case_insensitive: { type: "boolean", default: false, description: "Case-insensitive match." },
-      output_mode: {
-        type: "string",
-        enum: ["content", "files_with_matches", "count"],
-        description: "What to return: 'content' = matching lines with file:line (default), 'files_with_matches' = just the file paths, 'count' = per-file match counts.",
-        default: "content",
-      },
-      context_lines: { type: "number", description: "Lines of context to show before AND after each match (ripgrep -C). Only applies to output_mode 'content'." },
-      multiline: { type: "boolean", default: false, description: "Allow the pattern to span line boundaries (ripgrep --multiline; '.' matches newlines)." },
-      fixed_strings: { type: "boolean", default: false, description: "Treat the pattern as a literal string, not a regex (ripgrep -F)." },
+      glob: { type: "string", description: "Optional glob filter, e.g. '*.ts'." },
+      case_insensitive: { type: "boolean", default: false },
     },
     required: ["pattern"],
   },
@@ -83,33 +95,53 @@ export const LOCAL_TOOL_PARAMETERS: Record<string, Record<string, unknown>> = {
     type: "object",
     properties: {
       path: { type: "string", description: "Path to list. Defaults to the working directory." },
-      show_hidden: { type: "boolean", default: false, description: "Include dotfiles (.env, .gitignore, .github, etc.) in the listing." },
-      recursive: { type: "boolean", default: false, description: "List subdirectories recursively (up to `depth` levels)." },
-      depth: { type: "number", description: "Max recursion depth when recursive=true (default 3)." },
     },
   },
 };
 
 /** Registry order for the 7 shared local tools. */
-export const LOCAL_TOOL_NAMES = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "LS"] as const;
+export const LOCAL_TOOL_NAMES: readonly string[] = [
+  "Read",
+  "Write",
+  "Edit",
+  "Bash",
+  "Glob",
+  "Grep",
+  "LS",
+];
 
 /**
  * Tools that can mutate the user's machine.
  *
- * Surfaces that add their own tools should extend this set locally rather than
- * modifying it here.
+ * Surfaces that add their own tools (e.g. CLI's Stoa, which hits a real SaaS)
+ * should extend this set locally rather than modifying it here.
  */
-export const MUTATING_LOCAL_TOOLS: ReadonlySet<string> = new Set(["Write", "Edit", "Bash"]);
+export const MUTATING_LOCAL_TOOLS: ReadonlySet<string> = new Set([
+  "Write",
+  "Edit",
+  "Bash",
+]);
 
 /**
  * Build the full OpenAI-style tool schema array for the 7 local tools.
  *
  * Each surface supplies its own `descriptions` map (keyed by tool name) so
- * the prose stays per-runtime. A missing description defaults to an empty string.
+ * the prose stays per-runtime (CLI vs VS Code). The shared `parameters` schema
+ * is filled in from `LOCAL_TOOL_PARAMETERS`. A missing description defaults to
+ * an empty string — no throw.
+ *
+ * @example
+ * const schemas = buildLocalToolSchemas({
+ *   Read: "Read a file from the workspace.",
+ *   Write: "Write a file to the workspace.",
+ *   // ...
+ * });
  */
-export function buildLocalToolSchemas(descriptions: Record<string, string>): LocalToolDef[] {
+export function buildLocalToolSchemas(
+  descriptions: Record<string, string>,
+): LocalToolDef[] {
   return LOCAL_TOOL_NAMES.map((name) => ({
-    type: "function" as const,
+    type: "function",
     function: {
       name,
       description: descriptions[name] ?? "",

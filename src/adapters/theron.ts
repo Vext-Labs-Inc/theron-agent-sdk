@@ -1,10 +1,5 @@
-import type { ModelAdapter } from "../runtime/index.js";
-import { resolveJuwelToken } from "./juwel_auth.js";
-
-export { resolveJuwelToken };
-
 /**
- * Theron ModelAdapter — first-class, built-in. Drives the hosted Theron
+ * Theron ModelAdapter — first-class, built-in. Drives the Vext-hosted Theron
  * council so agents you build with this SDK run on Theron's substrate (the
  * trained specialists + verifier kernels), not a single foundation model.
  *
@@ -17,29 +12,25 @@ export { resolveJuwelToken };
  *
  * Talks to the OpenAI-compatible council endpoint
  * (`<base>/api/v1/chat/completions`), so tool-calling and streaming work the
- * same way they do for the OpenAI/OpenRouter reference adapters.
+ * same way they do for the OpenAI/OpenRouter reference adapters — unlike the
+ * older phased-SSE example, which could not call tools.
  */
+import type { ModelAdapter } from "../runtime/index.js";
+import { resolveJuwelToken } from "./juwel_auth.js";
+
 export interface TheronAdapterOptions {
   /** Endpoint base. Defaults to the hosted council at itstheron.com. */
   base?: string;
-  /** Bearer key. Optional for free-tier LLM caps; required for
+  /** Vext / Theron bearer key. Optional for free-tier LLM caps; required for
    *  anything privileged. When set, it takes precedence over `tokenProvider`. */
   apiKey?: string;
   /** Async bearer resolver, used only when `apiKey` is absent. Defaults to
    *  `resolveJuwelToken` (JUWEL_TOKEN env, then ~/.juwel/config.json), so an
-   *  agent authenticates as the signed-in account with no extra config.
+   *  agent authenticates as the signed-in JUWEL account with no extra config.
    *  Return undefined to keep the anonymous free-tier path (no auth header). */
   tokenProvider?: () => Promise<string | undefined>;
   /** Council mode: "fast" (cheaper cascade) or "full" (deep). Default "fast". */
   councilMode?: "fast" | "full";
-}
-
-function safeJson(s: string | undefined): unknown {
-  try {
-    return JSON.parse(s || "{}");
-  } catch {
-    return {};
-  }
 }
 
 /** Build a first-class Theron adapter. Alias: `theron`. */
@@ -48,6 +39,7 @@ export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
   const url = `${base}/api/v1/chat/completions`;
   const councilMode = opts.councilMode ?? "fast";
   const tokenProvider = opts.tokenProvider ?? resolveJuwelToken;
+
   return {
     name: "theron",
     async chat({ model, messages, tools, max_tokens, temperature, onDelta }) {
@@ -65,20 +57,23 @@ export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
           function: { name: t.name, description: t.description, parameters: t.input_schema },
         }));
       }
+
       const headers: Record<string, string> = { "Content-Type": "application/json" };
+      // Resolution order: explicit apiKey > tokenProvider (JUWEL device login) >
+      // anonymous free-tier (no auth header). A static apiKey never triggers the
+      // provider, so existing call sites are unchanged.
       let bearer = opts.apiKey;
       if (!bearer) {
-        try {
-          bearer = await tokenProvider();
-        } catch {
-          /* token provider failed; continue anonymous */
-        }
+        try { bearer = await tokenProvider(); } catch { /* stay anonymous */ }
       }
       if (bearer) headers.Authorization = `Bearer ${bearer}`;
+
       const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
       if (!res.ok) {
         throw new Error(`Theron ${res.status} (${url}): ${(await res.text().catch(() => "")).slice(0, 500)}`);
       }
+
+      // Streaming path — OpenAI-style SSE deltas.
       if (onDelta && res.body) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -98,20 +93,19 @@ export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
             const data = line.slice(5).trim();
             if (!data || data === "[DONE]") continue;
             try {
-              const json = JSON.parse(data) as {
-                choices?: Array<{ delta?: { content?: string; tool_calls?: Array<{ index?: number; function?: { name?: string; arguments?: string } }> } }>;
-                usage?: { prompt_tokens?: number; completion_tokens?: number };
-              };
+              const json = JSON.parse(data);
               const d = json.choices?.[0]?.delta;
               const delta = d?.content;
               if (delta) {
                 onDelta(delta);
                 content += delta;
               }
+              // Accumulate streamed tool_calls (OpenAI sends them as indexed fragments). Without this,
+              // every tool-using agent is broken: the model asks to call a tool and the SDK drops it.
               if (Array.isArray(d?.tool_calls)) {
-                for (const tc of d.tool_calls) {
+                for (const tc of d.tool_calls as Array<{ index?: number; function?: { name?: string; arguments?: string } }>) {
                   const i = typeof tc.index === "number" ? tc.index : 0;
-                  toolAcc[i] ??= { name: "", args: "" };
+                  (toolAcc[i] ??= { name: "", args: "" });
                   if (tc.function?.name) toolAcc[i].name = tc.function.name;
                   if (tc.function?.arguments) toolAcc[i].args += tc.function.arguments;
                 }
@@ -121,7 +115,7 @@ export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
                 outputTokens = json.usage.completion_tokens ?? outputTokens;
               }
             } catch {
-              /* ignore malformed SSE frames */
+              // ignore malformed SSE line
             }
           }
         }
@@ -130,8 +124,12 @@ export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
           : undefined;
         return { content, tool_calls, tokens: { input: inputTokens, output: outputTokens } };
       }
+
+      // Non-streaming path.
       const json = (await res.json()) as {
-        choices?: Array<{ message?: { content?: string; tool_calls?: Array<{ function: { name: string; arguments: string } }> } }>;
+        choices: Array<{
+          message: { content: string; tool_calls?: Array<{ function: { name: string; arguments: string } }> };
+        }>;
         usage?: { prompt_tokens?: number; completion_tokens?: number };
       };
       const msg = json.choices?.[0]?.message ?? { content: "" };
@@ -152,4 +150,16 @@ export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
 }
 
 /** Convenience alias matching the docs voice (`theron({...})`). */
-export const theron: typeof theronAdapter = theronAdapter;
+export const theron = theronAdapter;
+
+// Re-export the JUWEL token provider so consumers of the `./adapters/theron`
+// subpath can supply / inspect the default `tokenProvider`.
+export { resolveJuwelToken } from "./juwel_auth.js";
+
+function safeJson(s: string): unknown {
+  try {
+    return JSON.parse(s || "{}");
+  } catch {
+    return {};
+  }
+}
