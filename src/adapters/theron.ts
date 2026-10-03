@@ -18,16 +18,30 @@
 import type { ModelAdapter } from "../runtime/index.js";
 import { resolveJuwelToken } from "./juwel_auth.js";
 
+const DEFAULT_BASE = "https://itstheron.com";
+
+/** Exact origins that may receive the implicit account token. Do not add hosts. */
+const IMPLICIT_TOKEN_ORIGINS = new Set<string>([new URL(DEFAULT_BASE).origin]);
+
+function allowsImplicitToken(base: string): boolean {
+  try {
+    return IMPLICIT_TOKEN_ORIGINS.has(new URL(base).origin);
+  } catch {
+    return false;
+  }
+}
+
 export interface TheronAdapterOptions {
   /** Endpoint base. Defaults to the hosted council at itstheron.com. */
   base?: string;
   /** Vext / Theron bearer key. Optional for free-tier LLM caps; required for
    *  anything privileged. When set, it takes precedence over `tokenProvider`. */
   apiKey?: string;
-  /** Async bearer resolver, used only when `apiKey` is absent. Defaults to
-   *  `resolveJuwelToken` (JUWEL_TOKEN env, then ~/.juwel/config.json), so an
-   *  agent authenticates as the signed-in JUWEL account with no extra config.
-   *  Return undefined to keep the anonymous free-tier path (no auth header). */
+  /** Async bearer resolver, used only when `apiKey` is absent. When omitted,
+   *  `resolveJuwelToken` (JUWEL_TOKEN env, then ~/.juwel/config.json) runs only
+   *  if the effective base origin is the default hosted origin. A custom `base`
+   *  does not receive that implicit token. Pass `apiKey` or `tokenProvider` to
+   *  authenticate any other base. Return undefined for no auth header. */
   tokenProvider?: () => Promise<string | undefined>;
   /** Council mode: "fast" (cheaper cascade) or "full" (deep). Default "fast". */
   councilMode?: "fast" | "full";
@@ -35,10 +49,10 @@ export interface TheronAdapterOptions {
 
 /** Build a first-class Theron adapter. Alias: `theron`. */
 export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
-  const base = (opts.base ?? "https://itstheron.com").replace(/\/$/, "");
+  const base = (opts.base ?? DEFAULT_BASE).replace(/\/$/, "");
   const url = `${base}/api/v1/chat/completions`;
   const councilMode = opts.councilMode ?? "fast";
-  const tokenProvider = opts.tokenProvider ?? resolveJuwelToken;
+  const tokenProvider = opts.tokenProvider ?? (allowsImplicitToken(base) ? resolveJuwelToken : undefined);
 
   return {
     name: "theron",
@@ -59,11 +73,11 @@ export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
       }
 
       const headers: Record<string, string> = { "Content-Type": "application/json" };
-      // Resolution order: explicit apiKey > tokenProvider (JUWEL device login) >
-      // anonymous free-tier (no auth header). A static apiKey never triggers the
-      // provider, so existing call sites are unchanged.
+      // Resolution order: explicit apiKey > explicit tokenProvider > implicit
+      // account token on the default origin only > anonymous (no auth header).
+      // A static apiKey never triggers the provider.
       let bearer = opts.apiKey;
-      if (!bearer) {
+      if (!bearer && tokenProvider) {
         try { bearer = await tokenProvider(); } catch { /* stay anonymous */ }
       }
       if (bearer) headers.Authorization = `Bearer ${bearer}`;

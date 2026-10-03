@@ -5,6 +5,9 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- **Implicit account token stays on the default origin.** `theronAdapter` attaches `JUWEL_TOKEN` or `~/.juwel/config.json` only when the effective `base` origin is the default hosted origin. A custom `base` no longer receives that token. An explicit `apiKey` or `tokenProvider` is still sent.
+
 ## [0.3.2] - 2026-06-27
 
 ### Added
