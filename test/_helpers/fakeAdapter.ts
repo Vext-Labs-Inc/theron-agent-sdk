@@ -11,18 +11,17 @@ type ChatArgs = Parameters<ModelAdapter["chat"]>[0];
  *   - an object that mirrors the real adapter return shape
  *   - a function that receives the chat args and returns either of the above
  */
+type FakeObj = {
+  content: string;
+  tool_calls?: Array<{ name: string; input: unknown }>;
+  tokens?: { input: number; output: number };
+  cost_usd?: number;
+};
+
 export type FakeResponse =
   | string
-  | {
-      content: string;
-      tool_calls?: Array<{ name: string; input: unknown }>;
-      tokens?: { input: number; output: number };
-    }
-  | ((args: ChatArgs) => string | {
-      content: string;
-      tool_calls?: Array<{ name: string; input: unknown }>;
-      tokens?: { input: number; output: number };
-    });
+  | FakeObj
+  | ((args: ChatArgs) => string | FakeObj);
 
 export function fakeAdapter(responses: FakeResponse[]): ModelAdapter & {
   calls: ChatArgs[];
@@ -54,6 +53,7 @@ export function fakeAdapter(responses: FakeResponse[]): ModelAdapter & {
         content: resolved.content,
         ...(resolved.tool_calls ? { tool_calls: resolved.tool_calls } : {}),
         tokens: resolved.tokens ?? { input: 1, output: resolved.content.length },
+        ...(resolved.cost_usd !== undefined ? { cost_usd: resolved.cost_usd } : {}),
       };
     },
   };

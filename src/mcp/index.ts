@@ -12,9 +12,7 @@
 // JSON-RPC envelopes. It hands the resulting tool catalog to the Runner via
 // `asTools()`, where it becomes a normal Tool[] the LLM can call.
 //
-// The Theron-Cloud equivalent lives in marketing/api/_lib/mcp.ts and supplies
-// per-user MCP connections via KV storage. Both implementations speak the same
-// wire protocol; this one ships open-core so SDK users can plug arbitrary MCP
+// This client speaks the MCP wire protocol so SDK users can plug arbitrary MCP
 // servers into their own agents.
 
 import type { Tool, ToolContext, ToolSchema } from "../tools/index.js";
@@ -71,7 +69,7 @@ interface JsonRpcResponse {
  */
 export class MCPClient {
   readonly config: McpServerConfig;
-  private initialized = false;
+  private initPromise: Promise<void> | null = null;
   private toolCache: McpTool[] | null = null;
 
   constructor(config: McpServerConfig) {
@@ -158,7 +156,22 @@ export class MCPClient {
   }
 
   private async ensureInitialized(signal?: AbortSignal): Promise<void> {
-    if (this.initialized) return;
+    // Single-flight: concurrent listTools()/asTools()/callTool() callers share
+    // one in-flight initialize handshake instead of each firing their own
+    // (which spec-strict servers reject as a duplicate session). On failure the
+    // promise is cleared so a later call can retry.
+    if (!this.initPromise) {
+      this.initPromise = this.doInitialize(signal);
+    }
+    try {
+      await this.initPromise;
+    } catch (err) {
+      this.initPromise = null;
+      throw err;
+    }
+  }
+
+  private async doInitialize(signal?: AbortSignal): Promise<void> {
     await this.rpc(
       "initialize",
       {
@@ -170,7 +183,6 @@ export class MCPClient {
     );
     // notifications/initialized is fire-and-forget per spec.
     this.rpc("notifications/initialized", {}, signal).catch(() => undefined);
-    this.initialized = true;
   }
 
   private async rpc(
@@ -187,12 +199,14 @@ export class MCPClient {
       if (externalSignal.aborted) ac.abort();
       else externalSignal.addEventListener("abort", () => ac.abort());
     }
+    // JSON-RPC notifications (notifications/*) MUST NOT carry an id, or spec-strict MCP servers reject
+    // the whole session. Only requests get an id.
     const body: JsonRpcRequest = {
       jsonrpc: "2.0",
-      id: Date.now() + Math.floor(Math.random() * 1000),
       method,
       params,
-    };
+      ...(method.startsWith("notifications/") ? {} : { id: Date.now() + Math.floor(Math.random() * 1000) }),
+    } as JsonRpcRequest;
     try {
       const r = await fetch(this.config.url, {
         method: "POST",
@@ -216,11 +230,27 @@ export class MCPClient {
       const ct = r.headers.get("content-type") || "";
       if (ct.includes("text/event-stream")) {
         const text = await r.text();
-        const m = text.match(/data:\s*(\{[\s\S]*?\})\s*\n/);
-        if (!m) throw new Error("mcp sse stream had no data event");
-        const env = JSON.parse(m[1]) as JsonRpcResponse;
-        if (env.error) throw new Error(`mcp error: ${env.error.message}`);
-        return env.result;
+        // Robust SSE parse (the old regex was non-greedy — it truncated nested JSON at the first `}` —
+        // and required a trailing `\n`, so it missed the last event). Parse each event's `data:` payload
+        // as full JSON and return the first JSON-RPC response.
+        for (const ev of text.split(/\n\n/)) {
+          const payload = ev
+            .split(/\r?\n/)
+            .filter((l) => l.startsWith("data:"))
+            .map((l) => l.slice(5).replace(/^ /, ""))
+            .join("\n")
+            .trim();
+          if (!payload || payload === "[DONE]") continue;
+          let env: JsonRpcResponse;
+          try {
+            env = JSON.parse(payload) as JsonRpcResponse;
+          } catch {
+            continue; // not a complete JSON event
+          }
+          if (env.error) throw new Error(`mcp error: ${env.error.message}`);
+          return env.result;
+        }
+        throw new Error("mcp sse stream had no data event");
       }
       const env = (await r.json()) as JsonRpcResponse;
       if (env.error) throw new Error(`mcp error: ${env.error.message}`);

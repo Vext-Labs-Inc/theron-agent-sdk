@@ -10,6 +10,9 @@ import type { Memory } from "../memory/index.js";
 import type { ToolContext } from "../tools/index.js";
 import type { VerifierResult } from "../verifiers/index.js";
 
+// Per-session execution environment seam (cloud-VM backend + a local backend).
+export * from "./cloud-session.js";
+
 /** Events the Runner emits as it executes. Subscribe via runner.on(). */
 export type RunnerEvent =
   | { type: "agent_start"; agent: string; query: string }
@@ -21,6 +24,8 @@ export type RunnerEvent =
   | { type: "council_start"; council: string; query: string }
   | { type: "specialist_done"; specialist: string; output: CouncilSpecialistOutput }
   | { type: "council_done"; council: string; output: CouncilOutput }
+  | { type: "max_turns_exhausted"; agent: string; turns: number }
+  | { type: "aborted"; agent: string }
   | { type: "error"; agent: string; message: string };
 
 /**
@@ -41,11 +46,21 @@ export interface ModelAdapter {
     max_tokens?: number;
     temperature?: number;
     onDelta?: (delta: string) => void;
+    /** Cancellation signal — adapters should forward it to fetch(). */
+    signal?: AbortSignal;
   }): Promise<{
     content: string;
     tool_calls?: Array<{ name: string; input: unknown }>;
     tokens: { input: number; output: number };
+    /** Optional per-call cost in USD. Adapters that can compute it should set
+     *  it so AgentResult.cost_usd and the costUsdAtLeast stop-predicate work. */
+    cost_usd?: number;
   }>;
+}
+
+/** Per-run options. `signal` cancels the loop cooperatively. */
+export interface RunOptions {
+  signal?: AbortSignal;
 }
 
 export interface RunnerConfig {
@@ -114,8 +129,9 @@ export class Runner {
    *   4. Run any registered verifier kernels on the final output
    *   5. Return the AgentResult
    */
-  async run(agent: Agent, query: string): Promise<AgentResult> {
+  async run(agent: Agent, query: string, opts?: RunOptions): Promise<AgentResult> {
     const startedAt = Date.now();
+    const signal = opts?.signal;
     this.emit({ type: "agent_start", agent: agent.name, query });
 
     const messages: Array<{ role: "system" | "user" | "assistant" | "tool"; content: string }> = [
@@ -130,53 +146,98 @@ export class Runner {
     const toolCalls: Array<{ name: string; input: unknown; output: unknown }> = [];
     let tokensIn = 0;
     let tokensOut = 0;
+    let costUsd = 0;
     let finalOutput = "";
+    let completed = false;
+    let aborted = false;
 
     for (let turn = 0; turn < agent.max_turns; turn++) {
+      if (signal?.aborted) {
+        aborted = true;
+        this.emit({ type: "aborted", agent: agent.name });
+        break;
+      }
       const response = await this.model.chat({
         model: agent.model ?? this.default_model,
         messages,
         tools: agent.toolSchemas(),
         onDelta: (delta) => this.emit({ type: "agent_thinking", agent: agent.name, delta }),
+        signal,
       });
       tokensIn += response.tokens.input;
       tokensOut += response.tokens.output;
+      costUsd += response.cost_usd ?? 0;
 
       if (response.tool_calls && response.tool_calls.length > 0) {
-        // Push the assistant turn that requested the tool calls once,
-        // then push one tool-result message per call.
+        // Push the assistant turn that requested the tool calls once. Models
+        // routinely emit several tool calls per turn and they are independent,
+        // so execute them concurrently and append results in call order (the
+        // protocol requires the tool messages follow the assistant message in
+        // a stable order).
         messages.push({ role: "assistant", content: response.content });
-        for (const call of response.tool_calls) {
-          const tool = agent.tools.find((t) => t.schema.name === call.name);
-          if (!tool) {
-            this.emit({
-              type: "error",
-              agent: agent.name,
-              message: `Model called unknown tool: ${call.name}`,
-            });
-            messages.push({ role: "tool", content: `error: unknown tool ${call.name}` });
-            continue;
-          }
-          this.emit({ type: "tool_call_start", agent: agent.name, tool: call.name, input: call.input });
-          const t0 = Date.now();
-          try {
-            const output = await tool.execute(call.input, this.tool_context);
-            const ms = Date.now() - t0;
-            this.emit({ type: "tool_call_done", agent: agent.name, tool: call.name, output, ms });
-            toolCalls.push({ name: call.name, input: call.input, output });
-            messages.push({ role: "tool", content: JSON.stringify(output) });
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            this.emit({ type: "error", agent: agent.name, message: `Tool ${call.name} threw: ${msg}` });
-            messages.push({ role: "tool", content: `error: ${msg}` });
-          }
+        const calls = response.tool_calls;
+        const results = await Promise.all(
+          calls.map(async (call) => {
+            // Delegate-to-sub-agent call → recurse into runner.run(subAgent).
+            const subAgent = agent.findSubAgent(call.name);
+            if (subAgent) {
+              this.emit({ type: "tool_call_start", agent: agent.name, tool: call.name, input: call.input });
+              const t0 = Date.now();
+              try {
+                const task =
+                  typeof (call.input as { task?: unknown } | null)?.task === "string"
+                    ? (call.input as { task: string }).task
+                    : JSON.stringify(call.input);
+                const sub = await this.run(subAgent, task, { signal });
+                const ms = Date.now() - t0;
+                this.emit({ type: "tool_call_done", agent: agent.name, tool: call.name, output: sub.output, ms });
+                return { call, output: sub.output, content: sub.output, ok: true as const };
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                this.emit({ type: "error", agent: agent.name, message: `Sub-agent ${subAgent.name} threw: ${msg}` });
+                return { call, content: `error: ${msg}`, ok: false as const };
+              }
+            }
+            const tool = agent.tools.find((t) => t.schema.name === call.name);
+            if (!tool) {
+              this.emit({
+                type: "error",
+                agent: agent.name,
+                message: `Model called unknown tool: ${call.name}`,
+              });
+              return { call, content: `error: unknown tool ${call.name}`, ok: false as const };
+            }
+            this.emit({ type: "tool_call_start", agent: agent.name, tool: call.name, input: call.input });
+            const t0 = Date.now();
+            try {
+              const output = await tool.execute(call.input, this.tool_context);
+              const ms = Date.now() - t0;
+              this.emit({ type: "tool_call_done", agent: agent.name, tool: call.name, output, ms });
+              return { call, output, content: JSON.stringify(output), ok: true as const };
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              this.emit({ type: "error", agent: agent.name, message: `Tool ${call.name} threw: ${msg}` });
+              return { call, content: `error: ${msg}`, ok: false as const };
+            }
+          }),
+        );
+        for (const r of results) {
+          if (r.ok) toolCalls.push({ name: r.call.name, input: r.call.input, output: r.output });
+          messages.push({ role: "tool", content: r.content });
         }
         continue; // model gets to see tool results before producing final answer
       }
 
       finalOutput = response.content;
       messages.push({ role: "assistant", content: finalOutput });
+      completed = true;
       break;
+    }
+
+    if (!completed && !aborted) {
+      // The loop ran out of turns while the model was still calling tools, so
+      // there is no final text answer. Surface this instead of returning "".
+      this.emit({ type: "max_turns_exhausted", agent: agent.name, turns: agent.max_turns });
     }
 
     this.emit({ type: "agent_output", agent: agent.name, output: finalOutput });
@@ -205,7 +266,7 @@ export class Runner {
       tool_calls: toolCalls,
       verifier_results,
       tokens_used: { input: tokensIn, output: tokensOut },
-      cost_usd: 0, // adapter-specific; populated by adapter
+      cost_usd: costUsd, // summed from adapter-reported per-call cost (0 if the adapter doesn't report it)
       latency_ms,
     };
   }
@@ -216,8 +277,9 @@ export class Runner {
    * Fan out to all specialists in parallel (with timeout), gather outputs,
    * run council-level verifier kernels on each, and reconcile.
    */
-  async runCouncil(council: Council, query: string): Promise<CouncilOutput> {
+  async runCouncil(council: Council, query: string, opts?: RunOptions): Promise<CouncilOutput> {
     const startedAt = Date.now();
+    const signal = opts?.signal;
     this.emit({ type: "council_start", council: council.name, query });
 
     const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> =>
@@ -229,7 +291,7 @@ export class Runner {
     const specialistResults = await Promise.all(
       council.specialists.map(async (spec) => {
         try {
-          const result = await withTimeout(this.run(spec, query), council.specialist_timeout_ms);
+          const result = await withTimeout(this.run(spec, query, { signal }), council.specialist_timeout_ms);
           if (result === null) {
             this.emit({
               type: "error",
@@ -256,7 +318,11 @@ export class Runner {
           const out: CouncilSpecialistOutput = {
             specialist: spec.name,
             output: result.output,
-            claims: [], // claim extraction is the reconciler's job
+            // Extract claims if the council supplies an extractor; otherwise the
+            // reconciler is responsible (the default deterministic reconciler
+            // votes over these claims, so a council that wants automatic
+            // ratification should set `claimExtractor`).
+            claims: council.claimExtractor ? council.claimExtractor(result.output) : [],
             // AgentResult.verifier_results widens issues to unknown[]; at the
             // runtime layer we know every entry came from a Verifier.check()
             // call (which produces VerifierIssue[]), so the cast is sound.

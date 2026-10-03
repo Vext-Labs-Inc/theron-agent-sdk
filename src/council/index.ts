@@ -1,7 +1,7 @@
 // Council — N specialists deliberate, verifier kernels check, reconciler
 // produces the final answer.
 //
-// This is Theron Agent SDK's flagship primitive. The architecture nobody
+// This is JUWEL Agent SDK's flagship primitive. The architecture nobody
 // else ships as a first-class SDK abstraction.
 
 import type { Agent } from "../agent/index.js";
@@ -59,7 +59,35 @@ export interface CouncilConfig {
   reconciler?: Reconciler;
   /** Optional timeout per specialist (ms). Slow specialists are dropped. */
   specialist_timeout_ms?: number;
+  /**
+   * Optional claim extractor. The default deterministic reconciler votes over
+   * the per-specialist `claims` arrays — with no extractor those arrays are
+   * empty and the reconciler can only fall back to the first specialist's
+   * output ("refuted"). Supply an extractor (e.g. a sentence splitter, or a
+   * structured parser keyed on your specialists' output format) to enable
+   * real cross-specialist ratification. See `sentenceClaimExtractor`.
+   */
+  claimExtractor?: ClaimExtractor;
 }
+
+/** Turn a specialist's raw output into a list of claims for voting. */
+export type ClaimExtractor = (
+  output: string,
+) => Array<{ text: string; confidence: number; type: string }>;
+
+/**
+ * A simple, dependency-free claim extractor: split the output into sentences
+ * and treat each as an assertion at full confidence. Paraphrase-insensitive
+ * (the default reconciler matches claim text exactly, lowercased), so it
+ * ratifies only verbatim-agreeing claims — good enough for short, factual
+ * specialist answers; swap in a semantic extractor for prose.
+ */
+export const sentenceClaimExtractor: ClaimExtractor = (output) =>
+  output
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .map((text) => ({ text, confidence: 1, type: "assertion" }));
 
 /**
  * The Council primitive.
@@ -84,6 +112,7 @@ export class Council {
   public readonly verifiers: Verifier[];
   public readonly reconciler: Reconciler;
   public readonly specialist_timeout_ms: number;
+  public readonly claimExtractor: ClaimExtractor | undefined;
 
   constructor(config: CouncilConfig) {
     if (!config.name) throw new Error("Council requires a `name`.");
@@ -95,6 +124,7 @@ export class Council {
     this.verifiers = config.verifiers ?? [];
     this.reconciler = config.reconciler ?? deterministicClaimMerge;
     this.specialist_timeout_ms = config.specialist_timeout_ms ?? 30_000;
+    this.claimExtractor = config.claimExtractor;
   }
 
   /**
