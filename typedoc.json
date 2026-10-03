@@ -11,10 +11,10 @@
     "src/runtime/index.ts"
   ],
   "out": "docs",
-  "name": "Theron Agent SDK",
+  "name": "Vext SDK",
   "readme": "README.md",
   "navigationLinks": {
-    "Homepage": "https://tryvext.com/adk",
+    "Homepage": "https://github.com/Vext-Labs-Inc/theron-agent-sdk#readme",
     "GitHub": "https://github.com/Vext-Labs-Inc/theron-agent-sdk"
   },
   "githubPages": false,

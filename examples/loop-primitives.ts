@@ -4,7 +4,7 @@
  * Demonstrates the verified-ratchet + verifier-in-the-loop primitives — the
  * governance layer for agent loops. A loop's state advances ONLY on a confident
  * verifier pass; stop predicates terminate the loop on verifier/cost/step
- * conditions. No public agent SDK ships a verified ratchet as a typed primitive.
+ * conditions.
  *
  * Offline + deterministic — no API key. Swap the mock judges for real verifiers.
  *

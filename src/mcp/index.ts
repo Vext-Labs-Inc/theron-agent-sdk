@@ -8,7 +8,7 @@
 // Transport: streamable HTTP (JSON or SSE response). stdio is out of scope for
 // this client — for stdio servers, run them behind an HTTP proxy.
 //
-// Theron SDK is model-agnostic: this client only knows how to fetch + parse
+// The Vext SDK is model-agnostic: this client only knows how to fetch + parse
 // JSON-RPC envelopes. It hands the resulting tool catalog to the Runner via
 // `asTools()`, where it becomes a normal Tool[] the LLM can call.
 //
@@ -177,7 +177,7 @@ export class MCPClient {
       {
         protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {},
-        clientInfo: { name: "theron-agent-sdk", version: "0.1" },
+        clientInfo: { name: "@vextlabs/sdk", version: "0.1" },
       },
       signal,
     );

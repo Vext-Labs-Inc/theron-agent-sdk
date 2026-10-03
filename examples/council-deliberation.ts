@@ -8,10 +8,10 @@
  * Run:
  *   OPENROUTER_API_KEY=sk-or-... npx tsx examples/council-deliberation.ts
  *
- * Why OpenRouter and not the Theron adapter here? Council deliberation needs
- * three independent specialist calls. Local dev against OpenRouter gives you
- * that for ~$0.001/run. In production, point the Runner at theronAdapter and
- * the Vext-hosted council answers all three roles with trained LoRAs.
+ * Why OpenRouter here? Council deliberation needs three independent specialist
+ * calls. To use another server instead, point the Runner at
+ * `createVextAdapter({ baseURL })`, where the server accepts OpenAI-style
+ * requests at `<baseURL>/chat/completions`. There is no hosted default.
  */
 import { Agent, Council, Runner, VerifierKernels } from "../src/index.js";
 import { openrouterAdapter } from "./adapters/openrouter.js";

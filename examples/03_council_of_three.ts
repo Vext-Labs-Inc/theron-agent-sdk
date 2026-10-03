@@ -4,14 +4,14 @@
  * Three generic agents (Engineer, Security, Product) deliberate on a question.
  * Outputs are checked by verifier kernels before reconciliation.
  *
- * This is the 15-line Council pattern — the Theron Agent SDK moat in a single
+ * This is the 15-line Council pattern. The Vext SDK in a single
  * example.
  *
  * Run:
  *   OPENROUTER_API_KEY=sk-or-... npx tsx examples/03_council_of_three.ts
  *
  * What this demonstrates:
- *   - Council primitive (the flagship Theron Agent SDK feature)
+ *   - Council primitive (the flagship Vext SDK feature)
  *   - Multi-specialist deliberation
  *   - Verifier kernels applied across the council
  *   - Reconciler (deterministic claim-merge by default)

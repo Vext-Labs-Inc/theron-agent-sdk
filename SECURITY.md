@@ -2,41 +2,32 @@
 
 ## Reporting a vulnerability
 
-Send vulnerability reports to **security@tryvext.com**.
+Email vulnerability reports to **juwel@vextlabs.ai** with the subject line `Security`.
 
-Do **not** file a public GitHub issue, post to a forum, or tweet about an unpatched vulnerability.
+Do not file a public GitHub issue, post to a forum, or post on social media about an unpatched vulnerability.
 
 We'll acknowledge receipt within 48 hours and aim to provide a fix or remediation plan within 14 days for high-severity issues.
 
 ## Scope
 
-In scope:
-- The SDK code in this repository (`@vextlabs/theron-agent-sdk`)
-- The sample agents in `examples/`
-- The OpenRouter / OpenAI model adapters shipped here
+In scope: this package, `@vextlabs/sdk`, meaning the code in this repository, including the sample agents and model adapters in `examples/`.
 
-Out of scope (report to Vext separately):
-- Vext-hosted Theron API (`api.tryvext.com`) — report to `security@tryvext.com` with subject `[hosted]`
-- Stoa cap protocol — see [github.com/Vext-Labs-Inc/stoa/SECURITY.md](https://github.com/Vext-Labs-Inc/stoa/SECURITY.md)
-- The proprietary 15 Layer-1 LoRAs, the 450+ Hive agents, the Theron-Base model — separate disclosure channel
+Not vulnerabilities on their own:
 
-## Threat model
+- Tools running code on the host. That is what tools do. Sandboxing is up to the developer; `ToolContext.yolo` is the explicit consent flag.
+- Verifier kernel false positives or false negatives. The kernels are heuristics, not proofs.
+- Rate limits and retries for external services called by a model adapter. Those are the adapter's job.
 
-The SDK is a framework — it executes whatever code the developer integrates. Some things are *intentional* and not vulnerabilities:
+Examples of what would be a vulnerability:
 
-- Tools can execute arbitrary code on the host (that's their purpose). Sandboxing is the developer's responsibility; the SDK provides `ToolContext.yolo` as the affirmative consent flag.
-- Verifier kernels can return false positives or false negatives — they're heuristics, not proofs.
-- Model adapters call external services; rate limits + retries are the adapter's responsibility.
-
-What WOULD be a vulnerability:
-- Prompt injection that bypasses the verifier-kernel gating mechanism
+- Prompt injection that bypasses verifier-kernel gating
 - Tool-call schema validation failures that allow type confusion
-- Memory backend allowing cross-tenant data leak
-- Session event-log tampering that goes undetected
-- Streaming-response parsing that triggers RCE on malformed SSE
+- A memory backend leaking data across tenants
+- Undetected tampering with the session event log
+- Code execution triggered by malformed SSE in streaming-response parsing
 
-If unclear whether something is in scope, ask. Don't sit on it.
+If you are not sure whether something is in scope, email us and ask.
 
 ## Acknowledgments
 
-Researchers who report valid issues will be credited in the release notes (with permission). We don't currently have a bug bounty program; check back in 2026-Q3.
+With your permission, we credit researchers who report valid issues in the release notes. There is no bug bounty program.

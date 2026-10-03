@@ -1,15 +1,12 @@
-// Receipts — emit Stoa-shaped receipts for any agent action.
+// Receipts: emit receipts for agent actions.
 //
 // A receipt is a portable, signable record of "this agent did this thing at
-// this time, with these inputs, and got this output." The shape mirrors the
-// public Stoa cap-protocol envelope so receipts from this SDK can be POSTed
-// straight into a Stoa-conformant receipt sink (or batched + anchored via a
-// daily Merkle root) without translation.
+// this time, with these inputs, and got this output." Receipts use the
+// `stoa.receipt.v1` envelope format.
 //
-// This module ships open: emitter, in-memory sink, JSONL file sink, HTTP sink,
-// and a deterministic content hash. Signing keys + receipt-sink endpoint URLs
-// are caller-supplied (BYOK). Vext's hosted Stoa sink + key issuance is the
-// upgrade path; this SDK does not require it.
+// This module provides an emitter, an in-memory sink, a JSONL file sink, an
+// HTTP sink, and a deterministic content hash. Signing keys and receipt-sink
+// endpoint URLs are supplied by the caller.
 
 export interface ReceiptInput {
   /** Stable capability identifier. Examples: "agent.run", "council.deliberate",
@@ -39,7 +36,7 @@ export interface Receipt {
   /** Capability the receipt covers. */
   cap: string;
   /** Issuer DID or label. Defaults to "did:web:local". Production users set
-   *  this to their issuer DID (did:web:tryvext.com, did:web:acme.com, ...). */
+   *  this to their issuer DID (did:web:vextlabs.ai, did:web:acme.com, ...). */
   issuer: string;
   /** Actor — who/what produced this. */
   actor?: string;
@@ -74,7 +71,7 @@ export interface ReceiptSink {
 }
 
 /** A signer turns an unsigned receipt into a signed one. Implementations:
- *  ES256 (default Stoa scheme), Ed25519, HMAC-SHA256 (for internal flows). */
+ *  ES256, Ed25519, or HMAC-SHA256. */
 export interface ReceiptSigner {
   algorithm: "ES256" | "Ed25519" | "HMAC-SHA256" | string;
   issuer: string;
@@ -207,7 +204,7 @@ export function fileReceiptSink(path: string): ReceiptSink {
 }
 
 /**
- * HTTP sink — POSTs each receipt to a Stoa-conformant sink URL. The URL must
+ * HTTP sink: POSTs each receipt as JSON to the sink URL you provide. The URL must
  * accept `application/json` and return 2xx on accept.
  */
 export function httpReceiptSink(opts: {

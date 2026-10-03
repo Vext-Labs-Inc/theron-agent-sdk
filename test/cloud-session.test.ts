@@ -10,7 +10,7 @@ describe("LocalCloudSession (the testable CloudSession backend)", () => {
     try {
       expect(typeof session.id).toBe("string");
       expect(session.id.length).toBeGreaterThan(0);
-      expect(session.root).toMatch(/theron-session-/);
+      expect(session.root).toMatch(/vext-session-/);
     } finally {
       await session.dispose();
     }

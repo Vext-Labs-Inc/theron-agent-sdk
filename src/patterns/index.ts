@@ -1,11 +1,9 @@
 // patterns/index.ts — reasoning patterns as framework-agnostic primitives.
 //
-// JUWEL's server-side Hive runs these as loops; this module generalizes them
-// for ANY SDK user, on ANY provider. Each primitive takes provider-agnostic
-// async functions (generate / score / verify / critique) and returns a typed,
-// auditable result. No public agent SDK ships verifier/score-gated reasoning
-// patterns — self-consistency voting, verifier-guided best-of-N, iterative
-// self-refine — as first-class composable primitives; these do.
+// Verifier/score-gated reasoning patterns (self-consistency voting,
+// verifier-guided best-of-N, iterative self-refine, and more) for any
+// provider. Each primitive takes provider-agnostic async functions
+// (generate / score / verify / critique) and returns a typed, auditable result.
 //
 // Pure orchestration: no network, no model lock-in, no global state. Deterministic
 // given deterministic inputs (no Math.random), so they are trivially testable.
@@ -243,8 +241,8 @@ export interface ReflexionResult<T> {
 
 /** Verbal reinforcement: attempt → evaluate → reflect → retry, carrying the
  *  accumulated reflections into each next attempt; stops on success or attempt
- *  budget (Reflexion; Shinn et al., 2023). Distinct from self-refine — it learns
- *  from the OUTCOME (success/feedback), not just the output's surface quality. */
+ *  budget (Reflexion; Shinn et al., 2023). It carries outcome feedback
+ *  (success or failure) into the next attempt. */
 export async function reflexion<T>(opts: ReflexionOptions<T>): Promise<ReflexionResult<T>> {
   const maxAttempts = Math.max(1, Math.floor(opts.maxAttempts));
   const reflections: string[] = [];
@@ -311,8 +309,7 @@ export async function mixtureOfAgents(opts: MixtureOfAgentsOptions): Promise<Mix
 }
 
 // ── measureLift: does a pattern/loop actually beat the baseline? ──────────────
-// The empirical backbone of "the system is the moat, not raw scale": prove a
-// pattern helps by MEASURING its score lift over a single-shot baseline on a
+// Prove a pattern helps by MEASURING its score lift over a single-shot baseline on a
 // task set, rather than asserting it. Pure + deterministic given deterministic
 // inputs — no benchmark framework required.
 

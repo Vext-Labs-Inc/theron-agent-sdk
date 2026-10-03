@@ -1,21 +1,12 @@
 // Loop — verifier-in-the-loop stop predicates and the verified ratchet.
 //
-// WHY THIS MODULE EXISTS
-// ----------------------
-// Every public agent SDK (OpenAI Agents SDK, LangGraph, Anthropic Claude Agent
-// SDK, AutoGen, CrewAI) treats loop termination as a scalar: a max-step count,
-// a timeout, or an LLM "I am done" signal. None of them make the verifier a
-// first-class typed gate on loop progression.
-//
-// The verified ratchet is the core primitive missing from all of them:
+// A loop can stop on a max-step count, a timeout, or the model saying it is
+// done. This module adds a typed gate so progression can also depend on a
+// verifier. The verified ratchet:
 //   - Loop state may advance ONLY when a parameter-free verifier confirms the
 //     candidate output is correct.
-//   - Confidence is explicit and required — not a subjective LLM self-report.
+//   - Confidence is explicit and required, not a subjective LLM self-report.
 //   - The decision is typed and auditable; every advance/hold carries a reason.
-//
-// This mirrors the server-side Agent R&D Loop shipped in JUWEL's own
-// continual-improvement pipeline (CIP) where weight updates are committed only
-// on verified ratchet passes.
 
 import type { VerifierResult } from "../verifiers/index.js";
 
@@ -52,8 +43,8 @@ export interface LoopState {
  * so callers can build rich multi-factor stop conditions without modifying the
  * loop implementation.
  *
- * No public agent SDK ships a typed, composable, verifier-aware stop-predicate
- * as a first-class primitive — this is that primitive.
+ * A predicate is a plain function of LoopState, so it can depend on verifier
+ * results as well as step count and cost.
  */
 export type StopPredicate = (s: LoopState) => boolean;
 
@@ -84,9 +75,8 @@ export function costUsdAtLeast(min: number): StopPredicate {
 /**
  * Stop when the named verifier has produced a passing result.
  *
- * No public agent SDK makes verifier satisfaction a first-class loop-termination
- * condition. This is the bridge: the loop runs until a trusted, parameter-free
- * checker (not the LLM's self-report) confirms the output is correct.
+ * The loop runs until a parameter-free checker (not the LLM's self-report)
+ * confirms the output is correct.
  *
  * Returns `true` (stop) when ANY result in `verifier_results` whose
  * `kernel === kernelName` has `pass === true`.
@@ -177,19 +167,19 @@ export interface RatchetDecision {
  * A Ratchet is a pure function that maps a RatchetVerdict (or undefined, if no
  * verifier ran yet) to a RatchetDecision.
  *
- * The verified ratchet is the primitive that no public agent SDK ships:
+ * The verified ratchet:
  *   - Loop state advances ONLY on a proven verifier pass.
  *   - The confidence threshold is explicit and configured at construction time.
  *   - An absent verdict is treated as hold, not as pass — absence of proof is
  *     not proof of absence.
  *
- * This matches Theron's own server-side CIP loop, where weight commits require
+ * This matches the server-side improvement loop, where weight commits require
  * a verifier pass + confidence >= threshold before the ratchet clicks forward.
  */
 export type Ratchet = (v: RatchetVerdict | undefined) => RatchetDecision;
 
 /**
- * verifiedRatchet — the canonical Theron loop gate.
+ * verifiedRatchet, the canonical loop gate.
  *
  * Returns a Ratchet that advances ONLY when:
  *   1. A verdict is present (not undefined).
@@ -252,9 +242,8 @@ export function verifiedRatchet(opts?: { minConfidence?: number }): Ratchet {
  * caller supplies every async function, keeping the primitive testable and
  * framework-agnostic.
  *
- * No public agent SDK exposes this propose→trial→verify→ratchet cycle as a
- * typed, composable primitive with a verifier gate at step 3. That is the gap
- * this fills.
+ * This module exposes the propose, trial, verify, ratchet cycle as a typed,
+ * composable primitive with a verifier gate at step 3.
  */
 export interface ImprovementCycleSpec<P, T> {
   /** Generate a candidate proposal. */

@@ -1,4 +1,4 @@
-# Contributing to Theron Agent SDK
+# Contributing to the Vext SDK
 
 Thanks for considering a contribution. The SDK is MIT-licensed and built to grow with the community.
 
@@ -16,18 +16,18 @@ npm test
 
 **High-leverage contributions:**
 
-- **Model adapters** — new providers (AWS Bedrock, Cerebras, Groq, your own OSS endpoint). Adapter shape is in [src/runtime/index.ts](src/runtime/index.ts).
-- **Verifier kernels** — domain-specific deterministic checkers. SQL syntax, K8s YAML lint, Lean proof check, etc. See [src/verifiers/index.ts](src/verifiers/index.ts) for the contract.
-- **Memory backends** — pgvector, sqlite-vec, Cloudflare D1, Upstash Vector. See [src/memory/index.ts](src/memory/index.ts).
-- **Session persistence** — Postgres, Redis, R2. See [src/session/index.ts](src/session/index.ts).
-- **Sample agents** — new patterns that show off the SDK well. Drop one in `examples/` with a README of its own.
-- **Docs improvements** — better quick-starts, migration guides, comparison content.
+- **Model adapters**: new providers (AWS Bedrock, Cerebras, Groq, your own OSS endpoint). Adapter shape is in [src/runtime/index.ts](src/runtime/index.ts).
+- **Verifier kernels**: domain-specific deterministic checkers. SQL syntax, K8s YAML lint, Lean proof check, etc. See [src/verifiers/index.ts](src/verifiers/index.ts) for the contract.
+- **Memory backends**: pgvector, sqlite-vec, Cloudflare D1, Upstash Vector. See [src/memory/index.ts](src/memory/index.ts).
+- **Session persistence**: Postgres, Redis, R2. See [src/session/index.ts](src/session/index.ts).
+- **Sample agents**: new patterns that show off the SDK well. Drop one in `examples/` with a README of its own.
+- **Docs improvements**: better quick-starts, migration guides, comparison content.
 
 **Less helpful right now:**
 
-- Refactors-for-refactor's-sake on the core primitives — they're stable.
-- Hosted-runtime features — that's Vext's managed product, kept proprietary by design.
-- Pre-trained adapter weights — separate licensing concern; submit those to the Vext managed plan.
+- Refactors-for-refactor's-sake on the core primitives. They're stable.
+- Hosted-runtime features. This package is the framework; it runs on your own infrastructure.
+- Model weights. This repository contains code only.
 
 ## The bar
 
@@ -35,10 +35,10 @@ Every PR should:
 1. Pass `npm run build` (TypeScript clean)
 2. Pass `npm test`
 3. Include or update a sample / doc demonstrating the change
-4. Have a clear, descriptive title — no "fix bug" or "update code"
+4. Have a clear, descriptive title, not "fix bug" or "update code"
 5. Reference the issue it addresses (if any)
 
-For new primitives, the bar is higher — open an issue first to discuss before opening a PR. The five primitives (Agent, Council, Session, Memory, Tool) are the public surface; adding a sixth requires consensus.
+For new primitives, the bar is higher: open an issue first to discuss before opening a PR. The five primitives (Agent, Council, Session, Memory, Tool) are the public surface; adding a sixth requires consensus.
 
 ## PSTACK / Vstack (default for every agent)
 
@@ -49,20 +49,20 @@ Every agent working in this repo follows [`.cursor/rules/pstack.mdc`](.cursor/ru
 - TypeScript strict mode, no `any` unless commented why.
 - One file per primitive (mirror the existing layout).
 - Comments explain WHY, not WHAT. Identifiers should make WHAT obvious.
-- No em-dashes in source comments (we eat our own dogfood — see `VerifierKernels.emDash`).
-- No "AI-ism" words ("delve", "tapestry", "leverage", etc.) — see `VerifierKernels.aiIsm`.
+- No em-dashes in source comments (we follow our own rule, see `VerifierKernels.emDash`).
+- No "AI-ism" words ("delve", "tapestry", "leverage", etc.). See `VerifierKernels.aiIsm`.
 
 ## Issue triage
 
 Issues are triaged weekly by the maintainers. We tag:
-- `good first issue` — small, well-scoped, well-suited for first-time contributors
-- `help wanted` — we want this fixed but don't have bandwidth this cycle
-- `wontfix` — out of scope or against the architecture; comment explains why
-- `discussion` — needs design input before code
+- `good first issue`: small, well-scoped, well-suited for first-time contributors
+- `help wanted`: we want this fixed but don't have bandwidth this cycle
+- `wontfix`: out of scope or against the architecture; comment explains why
+- `discussion`: needs design input before code
 
 ## Security
 
-Found a vulnerability? See [SECURITY.md](SECURITY.md). Do not file a public issue; email `security@tryvext.com`.
+Found a vulnerability? See [SECURITY.md](SECURITY.md). Do not file a public issue; email `juwel@vextlabs.ai` with the subject line `Security`.
 
 ## Code of conduct
 
@@ -76,9 +76,8 @@ Releases are tagged via `git tag v0.X.Y && git push --tags`. Maintainers cut rel
 
 - General questions: open a Discussion on GitHub
 - Bugs: open an Issue
-- Vext managed Theron / hosted runtime / enterprise: `info@tryvext.com`
-- Security: `security@tryvext.com`
+- Security: `juwel@vextlabs.ai`, subject line `Security` (see [SECURITY.md](SECURITY.md))
 
 ---
 
-Maintained by [Vext Labs, Inc.](https://tryvext.com).
+Maintained by [Vext Labs, Inc.](https://vextlabs.ai).

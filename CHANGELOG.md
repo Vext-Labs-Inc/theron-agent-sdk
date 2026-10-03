@@ -1,14 +1,46 @@
 # Changelog
 
-All notable changes to `@vextlabs/theron-agent-sdk` are documented here.
+All notable changes to `@vextlabs/sdk` are documented here.
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-03
+
+This release is breaking. It renames the package and removes the hosted default endpoint.
+
+### Migration
+- Install the new package name: `npm uninstall @vextlabs/theron-agent-sdk && npm install @vextlabs/sdk`, then change imports from `@vextlabs/theron-agent-sdk` to `@vextlabs/sdk`. `theronAdapter`, `theron`, `TheronAdapterOptions`, and the `./adapters/theron` subpath still work as deprecated aliases.
+- Pass `baseURL` (or set `VEXT_BASE_URL`). It is the OpenAI-style API root. If you used `base: X` before, requests went to `X/api/v1/chat/completions`; pass `baseURL: "X/api/v1"` to keep the same URL.
+- Pass `model` on every call. There is no `theron-council` default.
+- Pass `max_tokens` and `temperature` if you relied on the old `2048` and `0.2` defaults.
+- Pass `councilMode` if your server expects a `council_mode` field.
+- To keep sending the account token, pass `resolveJuwelToken` as `tokenProvider`.
+- Custom `ModelAdapter` implementations receive `ModelMessage[]` and should return the upstream `id` on each tool call.
+- `LocalCloudSession.exec` no longer passes the whole parent `process.env` to the shell, as 0.4.1 did. It copies only `PATH`, `HOME`, `LANG`, `LANGUAGE`, `LC_ALL`, `LC_CTYPE`, `TERM`, `TZ`, `TMPDIR`, `TMP`, `TEMP`, `SHELL`, `USER`, and `LOGNAME`, then `options.env` as given. If a command needs anything else (for example `HTTPS_PROXY`, `NODE_EXTRA_CA_CERTS`, `SSH_AUTH_SOCK`, or an API key), pass it in `options.env`.
+
+### Breaking
+- **No hosted default.** `createVextAdapter` (deprecated alias `theronAdapter`) does not call a hosted endpoint. `baseURL` is the OpenAI-style API root. `chat` POSTs to `<baseURL>/chat/completions` (trailing slashes on the path stripped; a `?query` or `#fragment` on `baseURL`, such as Azure's `?api-version=`, is kept after the appended path). `https://api.openai.com/v1` posts to `https://api.openai.com/v1/chat/completions`. `http://127.0.0.1:11434/v1` posts to `http://127.0.0.1:11434/v1/chat/completions`. `chat` throws `MissingBaseURLError` with the message `No hosted default endpoint; pass baseURL or set VEXT_BASE_URL` when `baseURL`, the deprecated `base` option, `VEXT_BASE_URL`, and `THERON_BASE_URL` are all unset. The throw happens before any network call. `VEXT_BASE_URL` wins over `THERON_BASE_URL` when both are set. `baseURL` wins over `base` and over both env vars. Set `baseURL` together with `apiKey`; if `baseURL` is omitted, the env base decides where the key is sent.
+- **No default model, and no default `council_mode`.** `chat` throws `Missing model; pass model` when `model` is missing or blank. `council_mode` is included in the JSON body only when the caller sets `councilMode`.
+- **Package renamed.** The npm package `@vextlabs/theron-agent-sdk` is renamed to `@vextlabs/sdk`. The old name gets no further releases from this branch. Primary exports are `createVextAdapter`, `vext`, `VextAdapter`, and `VextAdapterOptions`, plus the `@vextlabs/sdk/adapters/vext` subpath. `theronAdapter`, `theron`, `TheronAdapterOptions`, and `@vextlabs/sdk/adapters/theron` remain as deprecated aliases. Root and subpath bundles share one `MissingBaseURLError` class via build splitting.
+- **No `max_tokens` or `temperature` defaults.** The adapter sends `max_tokens` and `temperature` only when the caller passes them to `chat`. The previous `2048` and `0.2` defaults are gone, so the server's defaults apply.
+- **`ModelAdapter` messages carry tool-call ids.** `chat` now receives `ModelMessage[]`: an assistant turn that requested tools has `tool_calls` (each with an `id`), and a tool result has `tool_call_id`. Adapters should return the upstream `id` on each tool call; the `Runner` synthesizes one when an adapter does not.
+- **Implicit account token is not sent.** The adapter does not read `JUWEL_TOKEN` or `~/.juwel/config.json` unless the caller passes that resolver as `tokenProvider`. An explicit `apiKey` or `tokenProvider` is still sent to the caller-supplied base.
+
+### Fixed
+- **Tool use against OpenAI-style servers.** The `Runner` sent the assistant turn without `tool_calls` and each tool result without `tool_call_id`, and the adapter dropped the upstream ids, so strict servers answered the second turn of a tool run with `400 Missing parameter 'tool_call_id'`. Ids from non-stream responses and stream deltas are now kept and sent back.
+- **Streamed token usage.** Streaming requests send `stream_options: { include_usage: true }`, so servers that only report usage on request now do.
+
+Known issue: published 0.4.1's default host redirects and the follow-on chat completions route returns 404. This release does not call that host.
+
+### Changed
+- **`VERSION` export.** `VERSION` now reports `0.5.0`. It previously reported `0.3.2`.
+- **Non-Node runtimes.** The adapter reads env vars through a guarded `globalThis.process`, so it works where `process` is undefined.
+- **Security contact.** Report vulnerabilities to `juwel@vextlabs.ai` with the subject line `Security`. See `SECURITY.md`.
+
 ### Security
-- **Implicit account token stays on the default origin.** `theronAdapter` attaches `JUWEL_TOKEN` or `~/.juwel/config.json` only when the effective `base` origin is the default hosted origin. A custom `base` no longer receives that token. An explicit `apiKey` or `tokenProvider` is still sent.
-- **Adapter fetch does not follow redirects.** `theronAdapter` sets `redirect: "error"`, so a 302 or 307 cannot replay `Authorization` to another origin, including under fetch polyfills that follow by default.
-- **Session shells do not inherit secret env vars.** `LocalCloudSession.exec` copies a small allowlist from `process.env` (`PATH`, `HOME`, `LANG`, `TERM`, and similar locale and temp variables) and then `options.env`. `JUWEL_TOKEN` and names ending in `_TOKEN`, `_KEY`, or `_SECRET` are not copied from the parent environment. Values passed in `options.env` are still set.
+- **Adapter fetch does not follow redirects.** `createVextAdapter` sets `redirect: "error"`, so a 302 or 307 cannot replay `Authorization` to another origin, including under fetch polyfills that follow by default. Cloudflare Workers supports this mode: the Request `redirect` option is `follow`, `error`, or `manual` ([Workers Request docs](https://developers.cloudflare.com/workers/runtime-apis/request/), reviewed 2026-07-02).
+- **Session shells are allowlist-only.** `LocalCloudSession.exec` copies `PATH`, `HOME`, `LANG`, `LANGUAGE`, `LC_ALL`, `LC_CTYPE`, `TERM`, `TZ`, `TMPDIR`, `TMP`, `TEMP`, `SHELL`, `USER`, and `LOGNAME` from `process.env`, then copies `options.env` as given. There is no second deny-list pass. Parent variables that are not on the allowlist are not inherited, including `JUWEL_TOKEN`, names ending in `_TOKEN`, `_KEY`, or `_SECRET`, `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, `npm_config_*`, `SSH_AUTH_SOCK`, `NVM_*`, `XDG_*`, and `VIRTUAL_ENV`. Pass any of those through `options.env` when a command needs them.
 
 ## [0.3.2] - 2026-06-27
 
@@ -35,19 +67,19 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.3.0] - 2026-06-13
 
 ### Added
-- **`patterns`** primitives — framework-agnostic, verifier/score-gated reasoning patterns no public agent SDK ships as first-class composables: `selfConsistency` (sample N paths → majority answer + agreement ratio), `bestOfN` (verifier-guided best-of-N), `selfRefine` (draft → critique → revise, early-exit when clean), `treeOfThoughts` (best-first branch/score/expand search), `chainOfVerification` (draft → verify claims independently → revise; hallucination reduction), `mixtureOfAgents` (layered multi-agent propose → refine-seeing-peers → aggregate), `reflexion` (retry with accumulated verbal reflections; learns from outcome feedback, not just output quality). Provider-agnostic (take async `generate`/`score`/`verify`/`critique` fns); pure, deterministic, zero-network. The SDK-side counterparts of Theron's server Hive loops.
-- **`measureLift`** — measure a pattern/loop's score lift + win-rate over a single-shot baseline on a task set. The empirical backbone for proving the harness beats raw single-shot ("the system is the moat") rather than asserting it. Pure; no benchmark framework required.
+- **`patterns`** primitives: framework-agnostic, verifier/score-gated reasoning patterns: `selfConsistency` (sample N paths, majority answer + agreement ratio), `bestOfN` (verifier-guided best-of-N), `selfRefine` (draft, critique, revise, early-exit when clean), `treeOfThoughts` (best-first branch/score/expand search), `chainOfVerification` (draft, verify claims independently, revise; hallucination reduction), `mixtureOfAgents` (layered multi-agent propose, refine-seeing-peers, aggregate), `reflexion` (retry with accumulated verbal reflections; learns from outcome feedback). Provider-agnostic (take async `generate`/`score`/`verify`/`critique` fns); pure, deterministic, zero-network. Each pattern is a plain function you can call from any agent loop.
+- **`measureLift`**: measure a pattern/loop's score lift + win-rate over a single-shot baseline on a task set. Use it to measure whether the harness beats single-shot. Pure; no benchmark framework required.
 - **`loop`** primitives: `verifiedRatchet` (advance only on a confident verifier pass), verifier-in-the-loop `stopWhen` predicates (`stepCountIs`/`costUsdAtLeast`/`verifierSatisfied`/`anyOf`/`allOf`), `runImprovementCycle`.
 - **Long-horizon primitives** — `compactHistory` (summarize-and-continue: fold older messages into a summary, keep recent verbatim, so a conversation/loop runs far past the context window), `runUntil` (a bounded, checkpointable long-horizon driver: run `step` until a predicate holds or `maxSteps`, with an `onCheckpoint` hook for durable resume), and `boundWorkingSet` (keep a long agent's working memory bounded by importance + recency; pinned items never evicted). Provider-agnostic + pure. The "run soo long, hold soo much context" kit.
 
 ## [0.1.0] - 2026-05-23
 
 First stable npm release. The five primitives and the runtime ship under the
-`@vextlabs/theron-agent-sdk` name with no API breaks expected through the 0.1
+`@vextlabs/sdk` name (published then as `@vextlabs/theron-agent-sdk`) with no API breaks expected through the 0.1
 line.
 
 ### Added (v0.1.0 release polish)
-- **`Receipts`** primitive: `ReceiptEmitter` + `InMemoryReceiptSink` + `fileReceiptSink` + `httpReceiptSink` + `ReceiptSigner` interface. Stoa-shaped receipts (`stoa.receipt.v1`) with deterministic SHA-256 content hash, ULID ids, optional detached signature. Importable as `@vextlabs/theron-agent-sdk/receipts` for tree-shake.
+- **`Receipts`** primitive: `ReceiptEmitter` + `InMemoryReceiptSink` + `fileReceiptSink` + `httpReceiptSink` + `ReceiptSigner` interface. Receipts use the `stoa.receipt.v1` envelope format, with deterministic SHA-256 content hash, ULID ids, optional detached signature. Importable as `@vextlabs/sdk/receipts` for tree-shake.
 - **Three sample agents** that ship in `examples/`:
   - `cyber-recon-bot.ts` — passive recon (subdomains → ports → TLS → tech), receipts per tool call.
   - `meeting-prep-bot.ts` — one-page meeting brief from calendar + docs + memory.
@@ -64,9 +96,9 @@ line.
 - **`Runner`** with pluggable `ModelAdapter` interface. Streams events (`agent_thinking`, `tool_call_*`, `verifier_run`, `council_done`, etc.). Supports per-specialist timeouts in `runCouncil`.
 - **Reference adapters** in `examples/adapters/`:
   - `openrouter.ts` — works against 200+ models with SSE streaming + tool-call buffering.
-  - `theron.ts` — points at the hosted Vext Theron endpoint at `tryvext.com/api/theron-chat-phased`.
+  - `adapters/vext`: adapter that POSTs to `<baseURL>/chat/completions`. Callers pass an OpenAI-style `baseURL`. There is no hosted default.
 - **Three runnable examples**: `basic-agent.ts`, `council-deliberation.ts`, `verifier-kernel.ts`.
-- **MCP client** at `@vextlabs/theron-agent-sdk/mcp` — `MCPClient` speaks the Model Context Protocol over streamable HTTP / SSE. `collectMcpTools()` collapses multiple servers into one namespaced `Tool[]`. Tests land in v0.1.x.
+- **MCP client** at `@vextlabs/sdk/mcp`. `MCPClient` speaks the Model Context Protocol over streamable HTTP / SSE. `collectMcpTools()` collapses multiple servers into one namespaced `Tool[]`. Tests land in v0.1.x.
 
 ### Build & tooling
 - Switched build from `tsc` to **`tsup`**. Emits ESM + CJS + `.d.ts` for every entry point. Tree-shakeable.

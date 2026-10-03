@@ -2,15 +2,37 @@
  * OpenRouter ModelAdapter — works against 200+ models for free-tier users.
  *
  * Used by the sample agents in the SDK. Production users should write their
- * own adapter for their preferred provider (OpenAI direct, Anthropic, Vext
- * managed Theron, etc.).
+ * own adapter for their preferred provider (OpenAI direct, Anthropic, or any
+ * server that implements `/chat/completions`).
+ *
+ * Tool calls keep their upstream `id`, assistant turns are sent back with
+ * `tool_calls`, and tool results carry `tool_call_id`, as the API requires.
  */
-import type { ModelAdapter } from "../../src/runtime/index.js";
+import type { ModelMessage, ModelToolCall, ModelAdapter } from "../../src/runtime/index.js";
 
 type ToolCallChunk = {
   index?: number;
+  id?: string;
   function?: { name?: string; arguments?: string };
 };
+
+function toWire(messages: ModelMessage[]): unknown[] {
+  return messages.map((m) => {
+    if (m.role === "assistant" && m.tool_calls && m.tool_calls.length > 0) {
+      return {
+        role: "assistant",
+        content: m.content === "" ? null : m.content,
+        tool_calls: m.tool_calls.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: { name: tc.name, arguments: JSON.stringify(tc.input ?? {}) },
+        })),
+      };
+    }
+    if (m.role === "tool") return { role: "tool", content: m.content, tool_call_id: m.tool_call_id };
+    return { role: m.role, content: m.content };
+  });
+}
 
 export function openrouterAdapter(opts: {
   apiKey: string;
@@ -27,11 +49,12 @@ export function openrouterAdapter(opts: {
     async chat({ model, messages, tools, max_tokens, temperature, onDelta }) {
       const body: Record<string, unknown> = {
         model,
-        messages,
-        max_tokens: max_tokens ?? 2048,
-        temperature: temperature ?? 0.2,
+        messages: toWire(messages),
         stream: !!onDelta,
       };
+      if (onDelta) body.stream_options = { include_usage: true };
+      if (max_tokens !== undefined) body.max_tokens = max_tokens;
+      if (temperature !== undefined) body.temperature = temperature;
       if (tools && tools.length > 0) {
         body.tools = tools.map((t) => ({
           type: "function",
@@ -62,7 +85,7 @@ export function openrouterAdapter(opts: {
         let content = "";
         let inputTokens = 0;
         let outputTokens = 0;
-        const toolCallBuffer = new Map<number, { name: string; argsText: string }>();
+        const toolCallBuffer = new Map<number, { id?: string; name: string; argsText: string }>();
         let buf = "";
         while (true) {
           const { value, done } = await reader.read();
@@ -86,6 +109,7 @@ export function openrouterAdapter(opts: {
                 for (const tc of toolCalls) {
                   const idx = tc.index ?? 0;
                   const cur = toolCallBuffer.get(idx) ?? { name: "", argsText: "" };
+                  if (tc.id) cur.id = tc.id;
                   if (tc.function?.name) cur.name = tc.function.name;
                   if (tc.function?.arguments) cur.argsText += tc.function.arguments;
                   toolCallBuffer.set(idx, cur);
@@ -102,7 +126,11 @@ export function openrouterAdapter(opts: {
         }
         const tool_calls = Array.from(toolCallBuffer.values())
           .filter((c) => c.name)
-          .map((c) => ({ name: c.name, input: safeJsonParse(c.argsText) }));
+          .map((c): ModelToolCall => ({
+            ...(c.id ? { id: c.id } : {}),
+            name: c.name,
+            input: safeJsonParse(c.argsText),
+          }));
         return {
           content,
           ...(tool_calls.length > 0 ? { tool_calls } : {}),
@@ -115,13 +143,14 @@ export function openrouterAdapter(opts: {
         choices: Array<{
           message: {
             content: string | null;
-            tool_calls?: Array<{ function: { name: string; arguments: string } }>;
+            tool_calls?: Array<{ id?: string; function: { name: string; arguments: string } }>;
           };
         }>;
         usage: { prompt_tokens: number; completion_tokens: number };
       };
       const msg = json.choices[0].message;
-      const tool_calls = msg.tool_calls?.map((tc) => ({
+      const tool_calls = msg.tool_calls?.map((tc): ModelToolCall => ({
+        ...(tc.id ? { id: tc.id } : {}),
         name: tc.function.name,
         input: safeJsonParse(tc.function.arguments),
       }));
