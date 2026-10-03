@@ -243,8 +243,8 @@ export interface ReflexionResult<T> {
 
 /** Verbal reinforcement: attempt → evaluate → reflect → retry, carrying the
  *  accumulated reflections into each next attempt; stops on success or attempt
- *  budget (Reflexion; Shinn et al., 2023). Distinct from self-refine — it learns
- *  from the OUTCOME (success/feedback), not just the output's surface quality. */
+ *  budget (Reflexion; Shinn et al., 2023). It carries outcome feedback
+ *  (success or failure) into the next attempt. */
 export async function reflexion<T>(opts: ReflexionOptions<T>): Promise<ReflexionResult<T>> {
   const maxAttempts = Math.max(1, Math.floor(opts.maxAttempts));
   const reflections: string[] = [];

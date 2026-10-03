@@ -51,10 +51,15 @@ afterEach(async () => {
 });
 
 function captureFetch() {
-  const calls: Array<{ url: string; authorization: string | null }> = [];
+  const calls: Array<{ url: string; authorization: string | null; body: Record<string, unknown> }> = [];
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const headers = new Headers(init?.headers);
-    calls.push({ url: String(input), authorization: headers.get("authorization") });
+    const raw = typeof init?.body === "string" ? init.body : "";
+    calls.push({
+      url: String(input),
+      authorization: headers.get("authorization"),
+      body: raw ? JSON.parse(raw) as Record<string, unknown> : {},
+    });
     return new Response(
       JSON.stringify({ choices: [{ message: { content: "ok" } }] }),
       { status: 200, headers: { "content-type": "application/json" } },
@@ -87,7 +92,7 @@ async function writeConfig(home: string, token: string) {
 async function chat(opts: Parameters<typeof createVextAdapter>[0]) {
   const adapter = createVextAdapter(opts);
   await adapter.chat({
-    model: "vext-council",
+    model: "test-model",
     messages: [{ role: "user", content: "hi" }],
   });
 }
@@ -134,7 +139,7 @@ describe("vext adapter base and implicit token", () => {
     await chat({ base: CUSTOM_BASE });
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe(`${CUSTOM_BASE}/api/v1/chat/completions`);
+    expect(calls[0].url).toBe(`${CUSTOM_BASE}/chat/completions`);
     expect(calls[0].authorization).toBeNull();
   });
 
@@ -218,7 +223,7 @@ describe("vext adapter base and implicit token", () => {
     await chat({ base: "HTTPS://Example.Test" });
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe("HTTPS://Example.Test/api/v1/chat/completions");
+    expect(calls[0].url).toBe("HTTPS://Example.Test/chat/completions");
     expect(calls[0].authorization).toBeNull();
   });
 
@@ -231,7 +236,7 @@ describe("vext adapter base and implicit token", () => {
     await chat({});
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe("https://from-vext-env.example/api/v1/chat/completions");
+    expect(calls[0].url).toBe("https://from-vext-env.example/chat/completions");
     expect(calls[0].authorization).toBeNull();
   });
 
@@ -244,7 +249,7 @@ describe("vext adapter base and implicit token", () => {
     await chat({});
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe("https://from-alias-env.example/api/v1/chat/completions");
+    expect(calls[0].url).toBe("https://from-alias-env.example/chat/completions");
     expect(calls[0].authorization).toBeNull();
   });
 
@@ -256,7 +261,7 @@ describe("vext adapter base and implicit token", () => {
 
     await chat({});
 
-    expect(calls[0].url).toBe("https://primary-env.example/api/v1/chat/completions");
+    expect(calls[0].url).toBe("https://primary-env.example/chat/completions");
   });
 
   it("prefers the baseURL option over both base env vars", async () => {
@@ -267,7 +272,7 @@ describe("vext adapter base and implicit token", () => {
 
     await chat({ baseURL: "https://from-option.example/", base: "https://from-legacy-option.example" });
 
-    expect(calls[0].url).toBe("https://from-option.example/api/v1/chat/completions");
+    expect(calls[0].url).toBe("https://from-option.example/chat/completions");
   });
 
   it("sends an explicit tokenProvider result to the caller base", async () => {
@@ -288,11 +293,11 @@ describe("vext adapter base and implicit token", () => {
     const calls = captureFetch();
 
     await theronAdapter({ baseURL: CUSTOM_BASE, apiKey: EXPLICIT_TOKEN }).chat({
-      model: "vext-council",
+      model: "test-model",
       messages: [{ role: "user", content: "hi" }],
     });
 
-    expect(calls[0].url).toBe(`${CUSTOM_BASE}/api/v1/chat/completions`);
+    expect(calls[0].url).toBe(`${CUSTOM_BASE}/chat/completions`);
     expect(calls[0].authorization).toBe(`Bearer ${EXPLICIT_TOKEN}`);
   });
 
@@ -321,5 +326,66 @@ describe("vext adapter base and implicit token", () => {
       await primary.close();
       await other.close();
     }
+  });
+
+  it("posts an OpenAI-style base to /chat/completions and omits council_mode", async () => {
+    await isolateHome();
+    const calls = captureFetch();
+
+    await chat({ baseURL: "https://api.openai.com/v1" });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("https://api.openai.com/v1/chat/completions");
+    expect(calls[0].body).not.toHaveProperty("council_mode");
+    expect(calls[0].body.model).toBe("test-model");
+  });
+
+  it("posts an Ollama-style base to /chat/completions and omits council_mode", async () => {
+    await isolateHome();
+    const calls = captureFetch();
+
+    await chat({ baseURL: "http://127.0.0.1:11434/v1" });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("http://127.0.0.1:11434/v1/chat/completions");
+    expect(calls[0].body).not.toHaveProperty("council_mode");
+  });
+
+  it("sends council_mode only when the caller sets it", async () => {
+    await isolateHome();
+    const calls = captureFetch();
+
+    await chat({ baseURL: CUSTOM_BASE, councilMode: "full" });
+
+    expect(calls[0].body.council_mode).toBe("full");
+  });
+
+  it("throws before any request when model is missing", async () => {
+    await isolateHome();
+    const calls = captureFetch();
+    const adapter = createVextAdapter({ baseURL: CUSTOM_BASE });
+
+    await expect(adapter.chat({
+      model: "  ",
+      messages: [{ role: "user", content: "hi" }],
+    })).rejects.toThrow("Missing model; pass model");
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it("uses baseURL when process is absent", async () => {
+    await isolateHome();
+    const calls = captureFetch();
+    const savedProcess = globalThis.process;
+    Object.defineProperty(globalThis, "process", { configurable: true, writable: true, value: undefined });
+    try {
+      await chat({ baseURL: CUSTOM_BASE, apiKey: EXPLICIT_TOKEN });
+    } finally {
+      Object.defineProperty(globalThis, "process", { configurable: true, writable: true, value: savedProcess });
+    }
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe(`${CUSTOM_BASE}/chat/completions`);
+    expect(calls[0].authorization).toBe(`Bearer ${EXPLICIT_TOKEN}`);
   });
 });

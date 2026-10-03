@@ -1,4 +1,4 @@
-// CloudSession — the seam behind cloud routines: an
+// CloudSession, the seam behind cloud routines: an
 // isolated, per-session execution environment with a filesystem, where tools
 // run server-side instead of on the user's machine.
 //

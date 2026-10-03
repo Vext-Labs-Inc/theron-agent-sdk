@@ -1,56 +1,52 @@
 /**
- * Vext model adapter. Bring your own endpoint (any OpenAI-compatible URL).
+ * Vext model adapter.
+ *
+ * `baseURL` is the OpenAI-style API root. `chat` POSTs to
+ * `<baseURL>/chat/completions` after stripping trailing slashes.
+ * `https://api.openai.com/v1` posts to `https://api.openai.com/v1/chat/completions`.
+ * An Ollama server uses `http://127.0.0.1:11434/v1`, which posts to
+ * `http://127.0.0.1:11434/v1/chat/completions`.
  *
  * There is no hosted default. Pass `baseURL`, or set `VEXT_BASE_URL`
  * (`THERON_BASE_URL` is a deprecated fallback used only when `VEXT_BASE_URL`
  * is unset). When none of those is set, `chat` throws {@link MissingBaseURLError}
  * before any network call.
  *
+ * Set `baseURL` together with `apiKey`. If `baseURL` is omitted, `VEXT_BASE_URL`
+ * (or `THERON_BASE_URL`) is the host that receives the key.
+ *
  *   import { Agent, Runner, createVextAdapter } from "@vextlabs/sdk";
  *
  *   const runner = new Runner({
  *     model: createVextAdapter({
- *       baseURL: "https://your-endpoint.example",
+ *       baseURL: "https://api.openai.com/v1",
  *       apiKey: process.env.VEXT_API_KEY,
  *     }),
- *     default_model: "your-model",
+ *     default_model: "gpt-4o-mini",
  *   });
  *
- * Talks to `<base>/api/v1/chat/completions`, so tool-calling and streaming work
- * the same way they do against any OpenAI-compatible server.
+ * `model` is required. `council_mode` is sent only when `councilMode` is set.
  */
 import type { ModelAdapter } from "../runtime/index.js";
-import { resolveJuwelToken } from "./juwel_auth.js";
+import { MissingBaseURLError } from "../errors.js";
 
-/**
- * Origins that may receive the implicit account token (`JUWEL_TOKEN` or
- * `~/.juwel/config.json`). Empty on purpose: that token is never attached.
- * An explicit `apiKey` or `tokenProvider` is still sent to the caller base.
- */
-const IMPLICIT_TOKEN_ORIGINS = new Set<string>();
+export { MissingBaseURLError } from "../errors.js";
 
-const MISSING_BASE_URL_MESSAGE = "No hosted default endpoint; pass baseURL or set VEXT_BASE_URL";
-
-/** Thrown when a chat call has no `baseURL` and no base env var. */
-export class MissingBaseURLError extends Error {
-  constructor() {
-    super(MISSING_BASE_URL_MESSAGE);
-    this.name = "MissingBaseURLError";
-  }
-}
-
-function allowsImplicitToken(base: string): boolean {
-  try {
-    return IMPLICIT_TOKEN_ORIGINS.has(new URL(base).origin);
-  } catch {
-    return false;
-  }
-}
+const MISSING_MODEL_MESSAGE = "Missing model; pass model";
 
 function configured(value: string | undefined): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function readEnv(name: string): string | undefined {
+  const proc = globalThis.process as { env?: Record<string, string | undefined> } | undefined;
+  if (typeof proc === "undefined" || proc === null) return undefined;
+  const env = proc.env;
+  if (typeof env !== "object" || env === null) return undefined;
+  const value = env[name];
+  return typeof value === "string" ? value : undefined;
 }
 
 /**
@@ -61,10 +57,10 @@ function resolveBase(opts: VextAdapterOptions): string {
   const explicit =
     configured(opts.baseURL) ??
     configured(opts.base) ??
-    configured(process.env.VEXT_BASE_URL) ??
-    configured(process.env.THERON_BASE_URL);
+    configured(readEnv("VEXT_BASE_URL")) ??
+    configured(readEnv("THERON_BASE_URL"));
   if (!explicit) throw new MissingBaseURLError();
-  return explicit.replace(/\/$/, "");
+  return explicit.replace(/\/+$/, "");
 }
 
 /** The adapter instance returned by {@link createVextAdapter}. */
@@ -72,8 +68,12 @@ export type VextAdapter = ModelAdapter;
 
 export interface VextAdapterOptions {
   /**
-   * Endpoint origin. Requests are sent to `<baseURL>/api/v1/chat/completions`.
+   * OpenAI-style API root. `chat` POSTs to `<baseURL>/chat/completions`
+   * (trailing slashes are stripped first).
+   * `https://api.openai.com/v1` becomes `https://api.openai.com/v1/chat/completions`.
+   * `http://127.0.0.1:11434/v1` becomes `http://127.0.0.1:11434/v1/chat/completions`.
    * Required unless `VEXT_BASE_URL` or the deprecated `THERON_BASE_URL` is set.
+   * Set this together with `apiKey`; otherwise the env base decides where the key goes.
    */
   baseURL?: string;
   /**
@@ -81,42 +81,49 @@ export interface VextAdapterOptions {
    * ahead of `VEXT_BASE_URL`.
    */
   base?: string;
-  /** Bearer key. When set, it takes precedence over `tokenProvider`. */
+  /**
+   * Bearer key. When set, it takes precedence over `tokenProvider`.
+   * Set `baseURL` alongside this key. If `baseURL` is omitted, `VEXT_BASE_URL`
+   * (then `THERON_BASE_URL`) decides which host receives it.
+   */
   apiKey?: string;
   /**
    * Async bearer resolver, used only when `apiKey` is absent. When omitted,
-   * no implicit account token is attached: the allow-origin set is empty, so
-   * `JUWEL_TOKEN` and `~/.juwel/config.json` are not sent anywhere. Pass
-   * `apiKey` or `tokenProvider` (for example {@link resolveJuwelToken}) to
-   * authenticate the caller-supplied base. Return undefined for no auth header.
+   * no account token is attached. Pass `apiKey` or `tokenProvider` (for example
+   * {@link resolveJuwelToken}) to authenticate the caller-supplied base.
+   * Return undefined for no auth header.
    */
   tokenProvider?: () => Promise<string | undefined>;
-  /** Council mode: "fast" (cheaper cascade) or "full" (deep). Default "fast". */
+  /**
+   * Optional council mode, `"fast"` or `"full"`. Omitted from the request body
+   * unless the caller sets it. There is no default.
+   */
   councilMode?: "fast" | "full";
 }
 
 /** @deprecated Use {@link VextAdapterOptions}. */
 export type TheronAdapterOptions = VextAdapterOptions;
 
-/** Build a Vext adapter for an OpenAI-compatible endpoint you supply. */
+/** Build a Vext adapter. `baseURL` is the OpenAI-style API root; requests go to `<baseURL>/chat/completions`. */
 export function createVextAdapter(opts: VextAdapterOptions = {}): VextAdapter {
-  const councilMode = opts.councilMode ?? "fast";
-
   return {
     name: "vext",
     async chat({ model, messages, tools, max_tokens, temperature, onDelta }) {
       const base = resolveBase(opts);
-      const url = `${base}/api/v1/chat/completions`;
-      const tokenProvider = opts.tokenProvider ?? (allowsImplicitToken(base) ? resolveJuwelToken : undefined);
+      if (typeof model !== "string" || model.trim() === "") {
+        throw new Error(MISSING_MODEL_MESSAGE);
+      }
+      const url = `${base}/chat/completions`;
+      const tokenProvider = opts.tokenProvider;
 
       const body: Record<string, unknown> = {
-        model: model || "vext-council",
-        council_mode: councilMode,
+        model,
         messages,
         max_tokens: max_tokens ?? 2048,
         temperature: temperature ?? 0.2,
         stream: !!onDelta,
       };
+      if (opts.councilMode) body.council_mode = opts.councilMode;
       if (tools && tools.length > 0) {
         body.tools = tools.map((t) => ({
           type: "function",
@@ -148,7 +155,7 @@ export function createVextAdapter(opts: VextAdapterOptions = {}): VextAdapter {
         throw new Error(`Vext ${res.status} (${url}): ${(await res.text().catch(() => "")).slice(0, 500)}`);
       }
 
-      // Streaming path — OpenAI-style SSE deltas.
+      // Streaming path. OpenAI-style SSE deltas.
       if (onDelta && res.body) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();

@@ -189,7 +189,7 @@ export interface RatchetDecision {
 export type Ratchet = (v: RatchetVerdict | undefined) => RatchetDecision;
 
 /**
- * verifiedRatchet — the canonical loop gate.
+ * verifiedRatchet, the canonical loop gate.
  *
  * Returns a Ratchet that advances ONLY when:
  *   1. A verdict is present (not undefined).

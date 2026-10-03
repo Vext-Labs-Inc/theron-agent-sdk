@@ -16,9 +16,9 @@ In scope:
 - The OpenRouter / OpenAI model adapters shipped here
 
 Out of scope (report to Vext separately):
-- Vext-managed APIs — report to `security@tryvext.com` with subject `[hosted]`
+- Vext-managed APIs. Report to `security@tryvext.com` with subject `[hosted]`
 - Stoa cap protocol — see [github.com/Vext-Labs-Inc/stoa/SECURITY.md](https://github.com/Vext-Labs-Inc/stoa/SECURITY.md)
-- The proprietary specialist models and agent fleet — separate disclosure channel
+- The proprietary specialist models and agent fleet. Separate disclosure channel.
 
 ## Threat model
 

@@ -1,4 +1,4 @@
-// Vext SDK — public surface (npm package @vextlabs/sdk).
+// Vext SDK. Public surface (npm package @vextlabs/sdk).
 //
 // The minimum import to build an agent:
 //   import { Agent, Council, Tool, Runner } from "@vextlabs/sdk";
@@ -85,7 +85,9 @@ export type {
 export { MCPClient, collectMcpTools } from "./mcp/index.js";
 export type { McpServerConfig, McpTool } from "./mcp/index.js";
 
-// Bring your own endpoint (any OpenAI-compatible URL). There is no hosted default.
+// `baseURL` is the OpenAI-style API root. Requests go to `<baseURL>/chat/completions`.
+// Set `baseURL` together with `apiKey`. If `baseURL` is omitted, `VEXT_BASE_URL`
+// decides where the key is sent. There is no hosted default.
 // `theronAdapter` / `theron` / `TheronAdapterOptions` are deprecated aliases of
 // the Vext names and are the same references.
 export {

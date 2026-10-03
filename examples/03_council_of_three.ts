@@ -4,7 +4,7 @@
  * Three generic agents (Engineer, Security, Product) deliberate on a question.
  * Outputs are checked by verifier kernels before reconciliation.
  *
- * This is the 15-line Council pattern — the Vext SDK moat in a single
+ * This is the 15-line Council pattern. The Vext SDK in a single
  * example.
  *
  * Run:

@@ -1,8 +1,8 @@
 // Council — N specialists deliberate, verifier kernels check, reconciler
 // produces the final answer.
 //
-// This is the Vext SDK's flagship primitive. The architecture nobody
-// else ships as a first-class SDK abstraction.
+// Specialists return answers. Verifier kernels check those answers.
+// A reconciler merges them into one result.
 
 import type { Agent } from "../agent/index.js";
 import type { Verifier, VerifierResult } from "../verifiers/index.js";
@@ -37,7 +37,7 @@ export interface CouncilOutput {
  *
  * Two kinds:
  *   - Deterministic reconcilers (regex / SMT / voting) — fast, cheap, no LLM
- *   - LLM reconcilers (a dedicated reconciler model) — better synthesis,
+ *   - LLM reconcilers (a dedicated reconciler model): better synthesis,
  *     more expensive
  *
  * The default is a deterministic claim-merging reconciler.

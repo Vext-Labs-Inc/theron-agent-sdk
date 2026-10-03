@@ -5,13 +5,15 @@
 [![npm](https://img.shields.io/npm/v/@vextlabs/sdk.svg)](https://www.npmjs.com/package/@vextlabs/sdk)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org/)
-[![tests](https://img.shields.io/badge/tests-64%20passing-brightgreen.svg)](#tests)
+[![tests](https://img.shields.io/badge/tests-231%20passing-brightgreen.svg)](#tests)
 
 ```sh
 npm i @vextlabs/sdk
 ```
 
-Bring your own endpoint (any OpenAI-compatible URL). There is no hosted default. Pass `baseURL`, or set `VEXT_BASE_URL` (`THERON_BASE_URL` is a deprecated fallback; `VEXT_BASE_URL` wins when both are set).
+`@vextlabs/sdk` is not yet published; current published package is `@vextlabs/theron-agent-sdk`.
+
+`baseURL` is the OpenAI-style API root. The adapter POSTs to `<baseURL>/chat/completions` after stripping trailing slashes. `https://api.openai.com/v1` posts to `https://api.openai.com/v1/chat/completions`. An Ollama server is `http://127.0.0.1:11434/v1`, which posts to `http://127.0.0.1:11434/v1/chat/completions`. There is no hosted default. Set `baseURL` together with `apiKey`. If you omit `baseURL`, `VEXT_BASE_URL` chooses the host that receives the key (`THERON_BASE_URL` is a deprecated fallback; `VEXT_BASE_URL` wins when both are set). `model` is required. `council_mode` is sent only when you set `councilMode`.
 
 ```sh
 export VEXT_BASE_URL=https://your-endpoint.example
@@ -33,7 +35,7 @@ const result = await runner.run(agent, "What's 2+2?");
 console.log(result.output);
 ```
 
-That is a runnable agent in a few lines. Requires Node 20+. `createVextAdapter` posts to `<baseURL>/api/v1/chat/completions`. Swap in Anthropic, OpenAI, or another endpoint by writing a `ModelAdapter`. `theronAdapter` and `import "@vextlabs/sdk/adapters/theron"` still work; they are deprecated aliases of `createVextAdapter` and `@vextlabs/sdk/adapters/vext`.
+That is a runnable agent in a few lines. Requires Node 20+. `createVextAdapter` POSTs to `<baseURL>/chat/completions`. Pass `baseURL` next to `apiKey` in the example above; otherwise `VEXT_BASE_URL` decides where that key is sent. `theronAdapter` and `import "@vextlabs/sdk/adapters/theron"` still work; they are deprecated aliases of `createVextAdapter` and `@vextlabs/sdk/adapters/vext`.
 
 ---
 
@@ -68,7 +70,7 @@ console.log(result.disagreements);      // surfaced if specialists disagreed
 
 The receipt chain is the differentiator. Every tool call, every Council vote, every output emits a content-hashed receipt you can sign with your own key and anchor in a daily Merkle root. When someone asks "did an AI do this," you hand them a document, not a vibe.
 
-The SDK is model-agnostic. The verifier kernels and the receipt chain work the same whether you point at OpenRouter, Anthropic, OpenAI, a local Ollama, or any other OpenAI-compatible URL.
+The verifier kernels and the receipt chain do not depend on a vendor. Point `createVextAdapter` at an OpenAI-style API root (`<baseURL>/chat/completions`), such as `https://api.openai.com/v1` or `http://127.0.0.1:11434/v1`.
 
 ## The five primitives
 
@@ -100,7 +102,7 @@ const out = await runner.runCouncil(council, "Review this PR for security risks"
 // or out.consensus === "split"   — disagreements surfaced (don't hide them — show them to the user)
 ```
 
-**The Council primitive runs locally.** You can run a Council of three generic agents and the SDK handles the deliberation, verifier dispatch, and reconciliation on your side. Point `createVextAdapter` at any OpenAI-compatible URL when you want a remote model.
+**The Council primitive runs in this process.** Three agents deliberate, verifier kernels check their output, and a reconciler merges the result. To call a remote model, pass `createVextAdapter` a `baseURL` such as `https://api.openai.com/v1`. The adapter POSTs to `<baseURL>/chat/completions`. Set that `baseURL` together with `apiKey`.
 
 ## Verifier kernels: fast, deterministic, free
 
@@ -174,11 +176,10 @@ five run end-to-end (offline, no API key).
 | Verifier kernels | **First-class typed kernels** | Skill assertions | Hooks pattern | User-implemented | User-implemented |
 | Memory + Session | Session (event log) + Memory (cross-session, swappable backend) | Honcho dialectic | Hooks-based | ADK Memory | Checkpointer |
 | Tool typing | **Zod schemas, validated I/O** | Function decorators | Pydantic schemas | Pydantic | Pydantic |
-| Model-agnostic | **Yes — any OpenAI-compatible endpoint** | Yes — 200+ via OpenRouter | Claude-optimized | Gemini-optimized | Yes |
+| Model calls | **POST `<baseURL>/chat/completions`** | Yes, 200+ via OpenRouter | Claude-optimized | Gemini-optimized | Yes |
 | Signed integrations | **Stoa cap protocol (ES256 receipts + Merkle anchor)** | MCP (no integrity) | MCP | MCP | Custom |
-| Managed substrate path | Bring your own endpoint (any OpenAI-compatible URL) | Nous Portal | Anthropic API | Vertex AI | LangGraph Cloud |
 
-We're not trying to beat Hermes-Agent on community size or Claude Agent SDK on Claude-specific polish. We're shipping the three primitives nobody else ships first-class: **Council + Verifier kernels + Signed integrations.** Plus the optional managed substrate where you get our trained specialists.
+This package includes a Council primitive, typed verifier kernels, and signed receipts.
 
 ## Receipts: every agent action, signable
 
@@ -247,7 +248,7 @@ This package is the framework. It is intentionally NOT:
 - A pre-built agent fleet — there are 3 sample agents in `examples/` to show you how to build, then you build your own
 - A hosted runtime — run it on your own infra (Node, Bun, Deno, serverless, container)
 
-If you want trained specialists or per-tenant tuning, that is Vext's managed product, separate from this package. The SDK is free. Bring your own endpoint (any OpenAI-compatible URL).
+This package does not host a model endpoint. Pass `baseURL` (the OpenAI-style API root; `/chat/completions` is appended) together with `apiKey`.
 
 ## Documentation
 
@@ -274,7 +275,3 @@ PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). We're particularly interest
 MIT — see [LICENSE](LICENSE).
 
 Built by [Vext Labs, Inc.](https://tryvext.com) (Maryland). Founder: Annalea Layton.
-
----
-
-*The framework is yours forever. The moat is the substrate underneath.*

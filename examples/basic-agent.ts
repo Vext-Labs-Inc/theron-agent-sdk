@@ -1,7 +1,10 @@
 /**
- * basic-agent — 1 tool, calls an OpenAI-compatible endpoint, streams to stdout.
+ * basic-agent: 1 tool, calls chat completions, streams to stdout.
  *
- * Bring your own endpoint (any OpenAI-compatible URL). There is no hosted default.
+ * `baseURL` is the OpenAI-style API root. The adapter POSTs to
+ * `<baseURL>/chat/completions`. OpenAI: `https://api.openai.com/v1`.
+ * Ollama: `http://127.0.0.1:11434/v1`. Set `baseURL` (or `VEXT_BASE_URL`)
+ * together with the API key. There is no hosted default.
  *
  * Run:
  *   VEXT_BASE_URL=https://your-endpoint.example VEXT_API_KEY=... npx tsx examples/basic-agent.ts
