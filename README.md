@@ -64,26 +64,28 @@ console.log(result.consensus);          // "ratified" | "split" | "refuted"
 console.log(result.disagreements);      // surfaced if specialists disagreed
 ```
 
-## Why Theron Agent SDK
+## What the SDK provides
 
-| | Theron Agent SDK | Claude Agent SDK | OpenAI Assistants | Vercel AI SDK |
-|---|---|---|---|---|
-| Multi-specialist deliberation | `Council` primitive with deterministic reconciliation | Sub-agents, you write the deliberation loop | Single assistant, you wire fan-out | Single model, you wire fan-out |
-| Output verification before return | Built-in `VerifierKernels` (em-dash, AI-ism, arithmetic, citation) plus `defineVerifier` | Hooks pattern, you implement the checkers | None built-in | None built-in |
-| Audit chain on every agent action | `Receipts` primitive: content-hashed, optionally ES256-signed, Merkle-anchorable via Stoa | None built-in | None built-in | None built-in |
+| Capability | How it works in this SDK |
+|---|---|
+| Multi-specialist deliberation | `Council` runs N specialist agents, checks their outputs with verifier kernels, and combines them with a reconciler |
+| Output verification | Built-in `VerifierKernels` (em-dash, AI-ism, arithmetic, citation) plus `defineVerifier` for your own checks |
+| Action records | `Receipts`: content-hashed records of agent actions, with an optional detached signature from a `ReceiptSigner` you supply |
+| Typed tools | Tools declare Zod input schemas |
+| Model choice | Any provider, through a `ModelAdapter` |
 
-The receipt chain is the differentiator. Every tool call, every Council vote, every output emits a content-hashed receipt you can sign with your own key and anchor in a daily Merkle root. When someone asks "did an AI do this," you hand them a document, not a vibe.
+Receipts are emitted by your code, for example from a `runner.on` handler on tool calls. Each receipt has a deterministic content hash, and you can sign it with your own key.
 
-The SDK is model-agnostic. The verifier kernels and the receipt chain work the same whether you point at OpenRouter, Anthropic, OpenAI, or a local Ollama.
+The verifier kernels and receipts do not depend on the model provider. They work the same with any `ModelAdapter`.
 
 ## The five primitives
 
 | Primitive | What it is | Why it matters |
 |---|---|---|
-| `Agent` (composer) | A model + instruction + tools + sub-agents + verifier slugs | The 5-line agent. Every other framework starts here |
+| `Agent` (composer) | A model + instruction + tools + sub-agents + verifier slugs | A basic agent takes about 5 lines |
 | `Runner` | The execution loop: LLM call + tool dispatch + verifier sweep + event stream | Pluggable `ModelAdapter` (OpenRouter, Anthropic, OpenAI, your own endpoint) |
 | `Verifier` | Deterministic render-then-judge / regex / arithmetic / citation kernels | Fast, free, no second LLM call. Built-ins in `VerifierKernels` |
-| `Receipts` | `ReceiptEmitter` + sinks. Stoa-shaped, content-hashed, optionally signed | Audit trail every external system can verify, no Vext lock-in |
+| `Receipts` | `ReceiptEmitter` + sinks. Content-hashed, optionally signed | A record of agent actions that you store and sign with your own sinks and keys |
 | `Council` | N specialists + verifier kernels + a reconciler | Multi-specialist deliberation primitive |
 
 Plus:
@@ -94,7 +96,7 @@ Plus:
 
 ## Why a Council?
 
-Every other agent framework binds to a model name string (`gpt-4o`, `claude-3-5-sonnet`). Theron Agent SDK binds to a Council of N specialists who deliberate and produce a reconciled answer.
+`runner.run` sends a task to one agent. `runner.runCouncil` sends it to a Council of N specialists, whose outputs are checked and reconciled into one answer.
 
 ```ts
 // Standard agent: one model decides
@@ -167,25 +169,11 @@ const { answer, consistency } = await selfConsistency({
 See [`examples/reasoning-patterns.ts`](examples/reasoning-patterns.ts) for all
 seven patterns plus `measureLift` run end-to-end (offline, no API key).
 
-## How this compares
-
-| | Theron Agent SDK | Hermes-Agent | Claude Agent SDK | Google ADK | LangGraph |
-|---|---|---|---|---|---|
-| License | **MIT** | MIT | Apache 2.0 | Apache 2.0 | MIT |
-| Multi-agent / Council | **Council primitive with a reconciler** | Sub-agents | Sub-agents | Multi-agent patterns | Supervisor / swarm |
-| Verifier kernels | **Typed verifier kernels** | Skill assertions | Hooks pattern | User-implemented | User-implemented |
-| Memory + Session | Session (event log) + Memory (cross-session, swappable backend) | Honcho dialectic | Hooks-based | ADK Memory | Checkpointer |
-| Tool typing | **Zod schemas, validated I/O** | Function decorators | Pydantic schemas | Pydantic | Pydantic |
-| Model-agnostic | Requests go to `<baseURL>/api/v1/chat/completions` and include a `council_mode` field | Yes, 200+ via OpenRouter | Claude-optimized | Gemini-optimized | Yes |
-| Signed integrations | **Stoa cap protocol (ES256 receipts + Merkle anchor)** | MCP (no integrity) | MCP | MCP | Custom |
-
-We're not trying to beat Hermes-Agent on community size or Claude Agent SDK on Claude-specific polish.
-
 ## Receipts: every agent action, signable
 
-The `Receipts` primitive gives every agent action a portable, content-hashed,
-optionally signed record. Receipts are shaped to drop straight into a Stoa
-sink, but the SDK runs offline with an in-memory sink for tests.
+The `Receipts` primitive gives an agent action a portable, content-hashed,
+optionally signed record. Sinks write receipts to memory, a JSONL file, or an
+HTTP endpoint you provide. The in-memory sink works offline, for tests.
 
 ```ts
 import {
@@ -197,7 +185,7 @@ const receipts = new ReceiptEmitter({
     new InMemoryReceiptSink(),
     fileReceiptSink("./receipts.jsonl"),
     // placeholder URL, replace with your sink
-    httpReceiptSink({ url: "https://example.com/receipt-sink", token: process.env.STOA }),
+    httpReceiptSink({ url: "https://example.com/receipt-sink", token: process.env.RECEIPT_SINK_TOKEN }),
   ],
   issuer: "did:web:acme.com",
   actor: "support-triage-bot",
