@@ -241,7 +241,7 @@ This package is the framework. It is intentionally NOT:
 
 - A pre-trained model. Bring your own (OpenRouter / OpenAI / Anthropic / your own OSS base)
 - A pre-built agent fleet. There are 11 runnable examples in `examples/`, 9 of them sample agents, to show you how to build, then you build your own
-- A hosted runtime. Run it on your own infra (Node, Bun, Deno, serverless, container)
+- A hosted runtime. Run it on your own infra. Node 20+ tested; other runtimes untested
 
 ## Documentation
 
@@ -275,4 +275,4 @@ PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). We're particularly interest
 
 MIT. See [LICENSE](LICENSE).
 
-Built by [Vext Labs, Inc.](https://tryvext.com) (Maryland). Founder: Annalea Layton.
+Built by [Vext Labs, Inc.](https://vextlabs.ai) (Maryland). Founder: Annalea Layton.

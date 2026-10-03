@@ -1,7 +1,6 @@
 // patterns/index.ts — reasoning patterns as framework-agnostic primitives.
 //
-// JUWEL's server-side Hive runs these as loops; this module generalizes them
-// for ANY SDK user, on ANY provider. Each primitive takes provider-agnostic
+// These patterns work with any provider. Each primitive takes provider-agnostic
 // async functions (generate / score / verify / critique) and returns a typed,
 // auditable result. The patterns include self-consistency voting,
 // verifier-guided best-of-N, and iterative self-refine.
