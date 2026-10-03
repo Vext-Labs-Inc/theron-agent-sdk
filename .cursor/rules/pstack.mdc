@@ -1,0 +1,86 @@
+---
+description: PSTACK / Vstack default working method for every agent working in this SDK repo
+alwaysApply: true
+---
+
+# PSTACK / Vstack working method
+
+This is the default way every agent (and every human driving one) works in this repo.
+It applies to code, tests, docs, examples, and release prep. It does not change the SDK's
+public API or its user-facing copy.
+
+## One orchestrator, narrow lanes
+
+- One orchestrator owns the task end to end: it scopes the work, splits it, and owns the final claim.
+- Split work into narrow lanes only when several files or areas can move in parallel. Each lane gets
+  one clear goal, a bounded set of files, and its own check.
+- A small change (one or two files, one concern) is one lane. Do not invent parallelism.
+- Lanes do not claim the overall task is done. They hand a receipt back to the orchestrator, and the
+  orchestrator re-runs the integrating check before saying anything is finished.
+
+## Every unit ends in a check
+
+- Every non-trivial unit of work ends in a check that can fail: a test, a build, a typecheck, a
+  script run, or a reproducible manual step.
+- Write or update the check alongside the change. A change to `src/` without a test that would catch
+  its regression is not done.
+- If a check cannot be run (missing secret, missing service), say so plainly and name what is
+  blocked. Do not route around it silently.
+
+## Receipts and the claim ceiling
+
+No "done", "green", "fixed", "passing", or "LIVE" claim without a receipt. A receipt contains:
+
+1. **Exact command** that was run, and its **real output** (trimmed, never paraphrased).
+2. **Full test counts before and after**: pass / fail / skipped / total. Call out any test that was
+   newly deleted or newly skipped (the expected number is zero).
+3. **Live surface**: a before/after observation for anything users can see or call (published
+   package, docs site, example output), or the explicit line "no live surface touched".
+4. **Rollback note**: how to undo the change (for example, "revert this commit; no data or
+   published artifact to clean up").
+
+The claim ceiling is what the receipts prove and nothing more. "Tests pass locally" is not
+"released". "Built" is not "published". If a receipt is missing, the claim drops to the last thing
+that was actually proven.
+
+## Where checks run
+
+- Checks run in Cursor: on cloud agents or on the maintainer's machine. Those runs, with receipts in
+  the PR body, are the merge gate.
+- GitHub Actions is not the merge gate for this repo. A green or missing Actions run does not
+  replace a receipt, and a receipt must not cite Actions output as its only proof.
+
+## Real checks in this repo
+
+Use the scripts this package actually ships. Do not reference tooling from other repos.
+
+- `npm ci` to install from the lockfile.
+- `npm test` (`vitest run`) for the full suite. Read the `Test Files` and `Tests` summary lines for
+  counts; add `--reporter=verbose` when a per-test list is useful.
+- `npm run build` (`tsup`) for a clean ESM + CJS + type declaration build.
+- `npm run test:coverage` when a change touches `src/` coverage thresholds.
+- `npm run example:<name>` when a change affects an example under `examples/`.
+- Never run `npm publish`, never push tags, and never force-push as part of routine agent work.
+  Releases are cut by maintainers (see `CONTRIBUTING.md`).
+
+## Keep PSTACK out of product copy
+
+PSTACK / Vstack is contributor process. Keep the vocabulary (orchestrator, lanes, receipts as a
+process term, claim ceiling) out of user-facing product copy: the README's product sections, API
+docs, error messages, exported identifiers, and example output. The SDK's own `receipts` module is
+a product feature and is unrelated to this process.
+
+## Cursor plugin concepts
+
+This method lines up with concepts from the Cursor pstack plugin. They live in the plugin, not in
+this repo, so do not create files for them here:
+
+- `/poteto-mode`: the plugin's mode for working in this style (orchestrator, narrow lanes, checks).
+- prove-it-works: the plugin's habit of proving a change with real commands and real output before
+  claiming it, which is the same bar as the receipts above.
+
+## PR receipt block
+
+Every PR fills in the "PSTACK / Vstack receipt" section of `.github/pull_request_template.md`:
+lane / orchestrator note, claim ceiling, blast radius if relevant, test counts before and after,
+and rollback.

@@ -40,6 +40,10 @@ Every PR should:
 
 For new primitives, the bar is higher — open an issue first to discuss before opening a PR. The five primitives (Agent, Council, Session, Memory, Tool) are the public surface; adding a sixth requires consensus.
 
+## PSTACK / Vstack (default for every agent)
+
+Every agent working in this repo follows [`.cursor/rules/pstack.mdc`](.cursor/rules/pstack.mdc): one orchestrator, narrow lanes, and every non-trivial unit ends in a check. The receipt ceiling: no done, green, or LIVE claim without the exact command and its real output, full test counts (pass / fail / skipped / total) before and after, a before/after for any live surface (or "no live surface touched"), and a rollback note. Checks run in Cursor (cloud agents or the maintainer machine); GitHub Actions is not the merge gate. Fill in the "PSTACK / Vstack receipt" block of the PR template.
+
 ## Code style
 
 - TypeScript strict mode, no `any` unless commented why.
