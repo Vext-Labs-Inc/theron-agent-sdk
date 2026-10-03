@@ -64,11 +64,11 @@ console.log(result.disagreements);      // surfaced if specialists disagreed
 
 | | Vext SDK | Claude Agent SDK | OpenAI Assistants | Vercel AI SDK |
 |---|---|---|---|---|
-| Multi-specialist deliberation | First-class `Council` primitive with deterministic reconciliation | Sub-agents, you write the deliberation loop | Single assistant, you wire fan-out | Single model, you wire fan-out |
+| Multi-specialist deliberation | `Council` primitive with deterministic reconciliation | Sub-agents, you write the deliberation loop | Single assistant, you wire fan-out | Single model, you wire fan-out |
 | Output verification before return | Built-in `VerifierKernels` (em-dash, AI-ism, arithmetic, citation) plus `defineVerifier` | Hooks pattern, you implement the checkers | None built-in | None built-in |
 | Audit chain on every agent action | `Receipts` primitive: content-hashed, optionally ES256-signed, Merkle-anchorable via Stoa | None built-in | None built-in | None built-in |
 
-The receipt chain is the differentiator. Every tool call, every Council vote, every output emits a content-hashed receipt you can sign with your own key and anchor in a daily Merkle root. When someone asks "did an AI do this," you hand them a document, not a vibe.
+Every tool call, Council vote, and output can emit a content-hashed receipt that you sign with your own key and anchor in a daily Merkle root. When someone asks whether an AI produced a result, the receipts are the record you can show them.
 
 The verifier kernels and the receipt chain do not depend on a vendor. Point `createVextAdapter` at an OpenAI-style API root (`<baseURL>/chat/completions`), such as `https://api.openai.com/v1` or `http://127.0.0.1:11434/v1`.
 
@@ -76,30 +76,30 @@ The verifier kernels and the receipt chain do not depend on a vendor. Point `cre
 
 | Primitive | What it is | Why it matters |
 |---|---|---|
-| `Agent` (composer) | A model + instruction + tools + sub-agents + verifier slugs | The 5-line agent — every other framework starts here |
-| `Runner` | The execution loop — LLM call + tool dispatch + verifier sweep + event stream | Pluggable `ModelAdapter` (OpenRouter, Anthropic, OpenAI, your own endpoint) |
-| `Verifier` | Deterministic render-then-judge / regex / arithmetic / citation kernels | Fast, free, no second LLM call — built-ins in `VerifierKernels` |
-| `Receipts` | `ReceiptEmitter` + sinks — Stoa-shaped, content-hashed, optionally signed | Audit trail every external system can verify, no Vext lock-in |
-| `Council` | N specialists + verifier kernels + a reconciler | Multi-specialist deliberation as a first-class primitive |
+| `Agent` (composer) | A model + instruction + tools + sub-agents + verifier slugs | The 5-line agent, where most frameworks start |
+| `Runner` | The execution loop: LLM call + tool dispatch + verifier sweep + event stream | Pluggable `ModelAdapter` (OpenRouter, Anthropic, OpenAI, your own endpoint) |
+| `Verifier` | Deterministic render-then-judge / regex / arithmetic / citation kernels | Fast, free, no second LLM call. Built-ins live in `VerifierKernels` |
+| `Receipts` | `ReceiptEmitter` + sinks: Stoa-shaped, content-hashed, optionally signed | Audit trail every external system can verify, no Vext lock-in |
+| `Council` | N specialists + verifier kernels + a reconciler | Multi-specialist deliberation as a built-in primitive |
 
 Plus:
-- `Session` — append-only event log + scoped state (checkpoint + time-travel debug)
-- `Memory` — cross-session, durable knowledge (`InMemoryStore` ships; plug in pgvector / R2 / SQLite for production)
-- `Tool` — typed function with auto-injected `ToolContext`; schema-from-Zod
-- `MCPClient` — Model Context Protocol over HTTP/SSE; surfaces any MCP server as `Tool[]`
+- `Session`: append-only event log + scoped state (checkpoint + time-travel debug)
+- `Memory`: cross-session, durable knowledge (`InMemoryStore` ships; plug in pgvector / R2 / SQLite for production)
+- `Tool`: typed function with auto-injected `ToolContext`; schema-from-Zod
+- `MCPClient`: Model Context Protocol over HTTP/SSE; surfaces any MCP server as `Tool[]`
 
 ## Why a Council?
 
 Every other agent framework binds to a model name string (`gpt-4o`, `claude-3-5-sonnet`). The Vext SDK binds to a Council of N specialists who deliberate and produce a reconciled answer.
 
 ```ts
-// Standard agent — one model decides
+// Standard agent: one model decides
 const out = await runner.run(agent, "Review this PR for security risks");
 
-// Council — three specialists deliberate, verifier kernels check, reconciler synthesizes
+// Council: three specialists deliberate, verifier kernels check, reconciler synthesizes
 const out = await runner.runCouncil(council, "Review this PR for security risks");
-// out.consensus === "ratified"  — all three agreed
-// or out.consensus === "split"   — disagreements surfaced (don't hide them — show them to the user)
+// out.consensus === "ratified"  (all three agreed)
+// or out.consensus === "split"   (disagreements surfaced; show them to the user)
 ```
 
 **The Council primitive runs in this process.** Three agents deliberate, verifier kernels check their output, and a reconciler merges the result. To call a remote model, pass `createVextAdapter` a `baseURL` such as `https://api.openai.com/v1`. The adapter POSTs to `<baseURL>/chat/completions`. Set that `baseURL` together with `apiKey`.
@@ -135,11 +135,9 @@ Every kernel runs in milliseconds. Pure regex / arithmetic / hash-equal. **No ad
 
 ## Reasoning patterns & loop primitives
 
-Framework- and provider-agnostic primitives for verifier/score-gated reasoning —
-the SDK-side counterparts of the server-side hive loops. Each takes plain async
-functions (`generate` / `score` / `verify` / `critique`), so they work on any
-model and compose anywhere. No other public agent SDK ships these as first-class
-typed primitives.
+Framework- and provider-agnostic primitives for verifier/score-gated reasoning.
+Each takes plain async functions (`generate` / `score` / `verify` / `critique`),
+so they work with any model and compose with the rest of your code.
 
 ```ts
 import {
@@ -172,8 +170,8 @@ five run end-to-end (offline, no API key).
 | | Vext SDK | Hermes-Agent | Claude Agent SDK | Google ADK | LangGraph |
 |---|---|---|---|---|---|
 | License | **MIT** | MIT | Apache 2.0 | Apache 2.0 | MIT |
-| Multi-agent / Council | **First-class primitive with reconciler** | Sub-agents | Sub-agents | Multi-agent patterns | Supervisor / swarm |
-| Verifier kernels | **First-class typed kernels** | Skill assertions | Hooks pattern | User-implemented | User-implemented |
+| Multi-agent / Council | **Built-in primitive with reconciler** | Sub-agents | Sub-agents | Multi-agent patterns | Supervisor / swarm |
+| Verifier kernels | **Built-in typed kernels** | Skill assertions | Hooks pattern | User-implemented | User-implemented |
 | Memory + Session | Session (event log) + Memory (cross-session, swappable backend) | Honcho dialectic | Hooks-based | ADK Memory | Checkpointer |
 | Tool typing | **Zod schemas, validated I/O** | Function decorators | Pydantic schemas | Pydantic | Pydantic |
 | Model calls | **POST `<baseURL>/chat/completions`** | Yes, 200+ via OpenRouter | Claude-optimized | Gemini-optimized | Yes |
@@ -219,7 +217,7 @@ a `ReceiptSigner` to attach an ES256 / Ed25519 / HMAC detached signature.
 ## Runnable examples
 
 The SDK ships with runnable examples in `examples/`. None require external
-network credentials — the agent examples mock every tool so they run offline
+network credentials: the agent examples mock every tool so they run offline
 against any OpenRouter-compatible model, and the pattern/loop examples are fully
 offline (no key at all).
 
@@ -228,8 +226,8 @@ offline (no key at all).
 | `cyber-recon-bot.ts` | Multi-tool recon chain (subdomains → ports → TLS → tech). Every tool call emits a receipt. |
 | `meeting-prep-bot.ts` | Calendar + docs + memory composition; produces a one-page meeting brief. |
 | `support-triage-bot.ts` | Three-specialist Council (classifier + retriever + writer); routing decision emitted as a signable receipt. |
-| `reasoning-patterns.ts` | All five reasoning patterns end-to-end (self-consistency, best-of-N, self-refine, tree-of-thoughts, chain-of-verification). **No key — fully offline.** |
-| `loop-primitives.ts` | Verified ratchet, `runImprovementCycle`, and verifier-in-the-loop stop predicates. **No key — fully offline.** |
+| `reasoning-patterns.ts` | All five reasoning patterns end-to-end (self-consistency, best-of-N, self-refine, tree-of-thoughts, chain-of-verification). **No key, fully offline.** |
+| `loop-primitives.ts` | Verified ratchet, `runImprovementCycle`, and verifier-in-the-loop stop predicates. **No key, fully offline.** |
 
 ```sh
 OPENROUTER_API_KEY=sk-or-... npm run example:cyber
@@ -244,15 +242,15 @@ npx tsx examples/loop-primitives.ts
 
 This package is the framework. It is intentionally NOT:
 
-- A pre-trained model — bring your own (OpenRouter / OpenAI / Anthropic / your own OSS base)
-- A pre-built agent fleet — there are 3 sample agents in `examples/` to show you how to build, then you build your own
-- A hosted runtime — run it on your own infra (Node, Bun, Deno, serverless, container)
+- A pre-trained model. Bring your own (OpenRouter / OpenAI / Anthropic / your own OSS base)
+- A pre-built agent fleet. There are 3 sample agents in `examples/` to show you how to build, then you build your own
+- A hosted runtime. Run it on your own infra (Node, Bun, Deno, serverless, container)
 
-This package does not host a model endpoint. Pass `baseURL` (the OpenAI-style API root; `/chat/completions` is appended) together with `apiKey`.
+This package does not host a model endpoint. Pass `baseURL` (the OpenAI-style API root; `/chat/completions` is appended to its path, and a `?query` such as `?api-version=` is kept) together with `apiKey`. The adapter sends `max_tokens` and `temperature` only when you pass them to `chat`; otherwise the server's defaults apply.
 
 ## Documentation
 
-- [Docs site](https://tryvext.com/adk)
+- [Docs](https://github.com/Vext-Labs-Inc/theron-agent-sdk#readme)
 - [Architecture](./docs/architecture.md)
 - [API reference](./docs/api.md)
 - [Migration guide (from LangChain / CrewAI / AutoGen)](./docs/migration.md)
@@ -272,6 +270,6 @@ PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). We're particularly interest
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
 Built by [Vext Labs, Inc.](https://tryvext.com) (Maryland). Founder: Annalea Layton.
