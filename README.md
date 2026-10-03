@@ -5,7 +5,7 @@
 [![npm](https://img.shields.io/npm/v/@vextlabs/sdk.svg)](https://www.npmjs.com/package/@vextlabs/sdk)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org/)
-[![tests](https://img.shields.io/badge/tests-231%20passing-brightgreen.svg)](#tests)
+[![tests](https://img.shields.io/badge/tests-243%20passing-brightgreen.svg)](#tests)
 
 ```sh
 npm i @vextlabs/sdk
@@ -243,17 +243,25 @@ This package is the framework. It is intentionally NOT:
 
 - A pre-trained model. Bring your own (OpenRouter / OpenAI / Anthropic / your own OSS base)
 - A pre-built agent fleet. There are 3 sample agents in `examples/` to show you how to build, then you build your own
-- A hosted runtime. Run it on your own infra (Node, Bun, Deno, serverless, container)
+- A hosted runtime. Run it on your own infra. Node 20+ tested; other runtimes untested
 
 This package does not host a model endpoint. Pass `baseURL` (the OpenAI-style API root; `/chat/completions` is appended to its path, and a `?query` such as `?api-version=` is kept) together with `apiKey`. The adapter sends `max_tokens` and `temperature` only when you pass them to `chat`; otherwise the server's defaults apply.
 
 ## Documentation
 
-- [Docs](https://github.com/Vext-Labs-Inc/theron-agent-sdk#readme)
-- [Architecture](./docs/architecture.md)
-- [API reference](./docs/api.md)
-- [Migration guide (from LangChain / CrewAI / AutoGen)](./docs/migration.md)
-- [Stoa cap protocol](https://github.com/Vext-Labs-Inc/stoa)
+- [README](https://github.com/Vext-Labs-Inc/theron-agent-sdk#readme)
+- [Changelog and migration notes](CHANGELOG.md)
+- [Security policy](SECURITY.md)
+- API reference: run `npm run docs` to generate it locally with TypeDoc.
+
+## Tests
+
+```sh
+npm ci
+npm test
+```
+
+The suite has 243 tests (Vitest).
 
 ## More from Vext Labs
 
