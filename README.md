@@ -5,7 +5,7 @@
 [![npm](https://img.shields.io/npm/v/@vextlabs/sdk.svg)](https://www.npmjs.com/package/@vextlabs/sdk)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org/)
-[![tests](https://img.shields.io/badge/tests-243%20passing-brightgreen.svg)](#tests)
+[![tests](https://img.shields.io/badge/tests-257%20passing-brightgreen.svg)](#tests)
 
 ```sh
 npm i @vextlabs/sdk
@@ -260,7 +260,7 @@ npm ci
 npm test
 ```
 
-The suite has 243 tests (Vitest).
+The suite has 257 tests (Vitest).
 
 ## More from Vext Labs
 
