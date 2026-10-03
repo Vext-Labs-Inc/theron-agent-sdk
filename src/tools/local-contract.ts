@@ -19,7 +19,7 @@
 // importing LOCAL_TOOL_PARAMETERS / MUTATING_LOCAL_TOOLS rather than re-declaring
 // them locally.
 
-/** OpenAI-compatible function tool definition (same shape as Anthropic via the `tools` field). */
+/** OpenAI-style function tool definition (same shape as Anthropic via the `tools` field). */
 export interface LocalToolDef {
   type: "function";
   function: {

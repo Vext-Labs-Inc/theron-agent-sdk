@@ -26,8 +26,8 @@ npm test
 **Less helpful right now:**
 
 - Refactors-for-refactor's-sake on the core primitives — they're stable.
-- Hosted-runtime features — that's Vext's managed product, kept proprietary by design.
-- Pre-trained adapter weights — separate licensing concern; submit those to the Vext managed plan.
+- Hosted-runtime features. This package is the framework; it runs on your own infrastructure.
+- Model weights. This repository contains code only.
 
 ## The bar
 

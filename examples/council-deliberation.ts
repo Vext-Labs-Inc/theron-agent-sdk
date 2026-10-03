@@ -9,8 +9,9 @@
  *   OPENROUTER_API_KEY=sk-or-... npx tsx examples/council-deliberation.ts
  *
  * Why OpenRouter here? Council deliberation needs three independent specialist
- * calls. Point the Runner at `createVextAdapter({ baseURL })` to use any
- * OpenAI-compatible URL instead. There is no hosted default.
+ * calls. To use another server instead, point the Runner at
+ * `createVextAdapter({ baseURL })`, where the server accepts OpenAI-style
+ * requests at `<baseURL>/chat/completions`. There is no hosted default.
  */
 import { Agent, Council, Runner, VerifierKernels } from "../src/index.js";
 import { openrouterAdapter } from "./adapters/openrouter.js";
