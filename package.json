@@ -1,6 +1,6 @@
 {
   "name": "@vextlabs/theron-agent-sdk",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Open-source agent SDK with a Council of specialists, deterministic verifier kernels, and Stoa-signed integrations. Build any agent against any model. From Vext Labs.",
   "license": "MIT",
   "homepage": "https://tryvext.com/adk",

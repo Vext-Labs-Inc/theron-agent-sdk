@@ -12,16 +12,31 @@ npm install @vextlabs/theron-agent-sdk
 ```
 
 ```ts
-import { Agent, Runner } from "@vextlabs/theron-agent-sdk";
-import { openrouterAdapter } from "@vextlabs/theron-agent-sdk/examples/adapters/openrouter.js";
+import { Agent, Runner, theronAdapter } from "@vextlabs/theron-agent-sdk";
 
 const agent = new Agent({ name: "helper", instruction: "Answer helpfully." });
-const runner = new Runner({ model: openrouterAdapter({ apiKey: process.env.OPENROUTER_API_KEY! }), default_model: "openai/gpt-4o-mini" });
+
+// Bring your own endpoint (any OpenAI-compatible URL).
+const runner = new Runner({
+  model: theronAdapter({
+    baseURL: "https://your-endpoint.example",
+    apiKey: process.env.THERON_API_KEY,
+  }),
+  default_model: "your-model",
+});
 const result = await runner.run(agent, "What's 2+2?");
 console.log(result.output);
 ```
 
-That is a runnable agent in five lines. Requires Node 20+. An `OPENROUTER_API_KEY` gets you 200+ models through one adapter; swap in Anthropic, OpenAI, or your own OSS endpoint by writing a 30-line `ModelAdapter`.
+```ts
+// THERON_BASE_URL is used when baseURL and base are both omitted.
+const fromEnv = new Runner({
+  model: theronAdapter({ apiKey: process.env.THERON_API_KEY }),
+  default_model: "your-model",
+});
+```
+
+There is no hosted default. Requires Node 20+. An `OPENROUTER_API_KEY` gets you 200+ models through one adapter; swap in Anthropic, OpenAI, or your own OSS endpoint by writing a 30-line `ModelAdapter`.
 
 ---
 
@@ -56,7 +71,7 @@ console.log(result.disagreements);      // surfaced if specialists disagreed
 
 The receipt chain is the differentiator. Every tool call, every Council vote, every output emits a content-hashed receipt you can sign with your own key and anchor in a daily Merkle root. When someone asks "did an AI do this," you hand them a document, not a vibe.
 
-The SDK is model-agnostic. The verifier kernels and the receipt chain work the same whether you point at OpenRouter, Anthropic, OpenAI, a local Ollama, or the hosted JUWEL substrate.
+The SDK is model-agnostic. The verifier kernels and the receipt chain work the same whether you point at OpenRouter, Anthropic, OpenAI, or a local Ollama.
 
 ## The five primitives
 
