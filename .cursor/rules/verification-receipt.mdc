@@ -1,0 +1,100 @@
+---
+description: Verification receipt, the default working method for every agent working in this SDK repo (orchestrator plus parallel lanes, prove-it-works receipts, no regressions)
+alwaysApply: true
+---
+
+# Verification receipt: default working method
+
+This is the default way every agent (and every human driving one) works in this repo.
+It applies to code, tests, docs, examples, and release prep. It does not change the SDK's
+public API or its user-facing copy.
+
+## One orchestrator, narrow lanes
+
+- One orchestrator owns the task end to end: it scopes the work, splits it, integrates it, and owns
+  the final claim. It reviews every lane's diff itself; a lane's "done" summary is not evidence.
+- Cut the work into verifiable units before fanning out. Each unit ends in a check; do not start the
+  next unit while the last one is red.
+- Split work into parallel lanes only when several files or areas can move at the same time. Each
+  lane gets one clear goal, a bounded set of files, its own branch and PR, and its own check. Two
+  lanes never write the same file.
+- A small change (one or two files, one concern) is one lane. Say so in the PR; do not invent
+  parallelism.
+- Lanes do not claim the overall task is done. They hand a receipt back to the orchestrator, and the
+  orchestrator re-runs the integrating check before saying anything is finished.
+- Hard-to-reverse work (releases, publishing, credentials, deleting data) needs a reviewer other
+  than the author. The orchestrator's own review is not enough.
+
+## Every unit ends in a check
+
+- Every non-trivial unit of work ends in a check that can fail: a test, a build, a typecheck, a
+  script run, or a reproducible manual step.
+- Write or update the check alongside the change. A change to `src/` without a test that would catch
+  its regression is not done.
+- Find the root cause before fixing: reproduce the problem first, then prove the fix against that
+  reproduction.
+- If a check cannot be run (missing secret, missing service), say so plainly and name what is
+  blocked. Do not route around it silently.
+
+## Receipts and the claim ceiling
+
+No "done", "green", "fixed", "passing", or "LIVE" claim without a receipt. Prove it works: check
+the real artifact, not a proxy (a file timestamp, "it compiles", a cached screenshot, or another
+agent's self-report). A receipt contains:
+
+1. **Exact command** that was run, and its **real output** (trimmed, never paraphrased).
+2. **Full test counts before and after**: pass / fail / skipped / total. State the number of tests
+   newly deleted or newly skipped (the expected number is 0). Pre-existing failures are reported
+   with proof that they also fail on `main`.
+3. **Live surface**: a before/after observation for anything users can see or call (published
+   package, docs site, example output), or the explicit line "no live surface touched".
+4. **Rollback note**: how to undo the change and how to confirm the undo worked (for example,
+   "revert this commit; no data or published artifact to clean up").
+
+The claim ceiling is what the receipts prove and nothing more. "Tests pass locally" is not
+"released". "Built" is not "published". If a receipt is missing, the claim drops to the last thing
+that was actually proven. Never invent metrics, benchmark results, or release status.
+
+## No regressions
+
+- Keep every existing test. Never delete, skip, `.only`, or path-filter a test to get green. The
+  test count never drops; a PR that removes a test says which one and why, and replaces its
+  coverage.
+- Never bypass hooks (`--no-verify`) or a failing check. A failing pre-existing check is reported,
+  not hidden.
+- Prefer idempotent, reversible steps: rebuild over mutate, and migrate callers before removing a
+  legacy path in the same change.
+
+## Where checks run
+
+- Checks can run locally in any editor or in Cursor, with receipts in the PR body. Contributors do
+  not need Cursor to contribute.
+- GitHub Actions is not the merge gate for this repo. A green or missing Actions run does not
+  replace a receipt, and a receipt must not cite Actions output as its only proof.
+
+## Real checks in this repo
+
+Use the scripts this package actually ships. Do not reference tooling from other repos.
+
+- `npm ci` to install from the lockfile.
+- `npm test` for the full suite (whatever the `test` script in `package.json` runs). Read the
+  summary lines it prints for pass / fail / skipped counts.
+- `npm run build` (`tsup`) for a clean ESM + CJS + type declaration build.
+- `npx tsc --noEmit` for a strict typecheck (the repo's `tsconfig.json` is strict).
+- `npm run test:coverage` when a change touches `src/` coverage thresholds.
+- `npm run example:<name>` when a change affects an example under `examples/`.
+- Never run `npm publish`, never push tags, and never force-push as part of routine agent work.
+  Releases are cut by maintainers (see `CONTRIBUTING.md`).
+
+## Keep process vocabulary out of product copy
+
+The verification receipt is contributor process. Keep its vocabulary (orchestrator, lanes,
+receipts as a process term, claim ceiling) out of user-facing product copy: the README's product
+sections, API docs, error messages, exported identifiers, and example output. The SDK's own
+`receipts` module is a product feature and is unrelated to this process.
+
+## PR receipt block
+
+Maintainers fill in the "Verification receipt" section of `.github/pull_request_template.md`:
+lane / orchestrator note, claim ceiling, blast radius if relevant, test counts before and after,
+tests deleted or skipped (0), live surface, and rollback. It is optional for external contributors.

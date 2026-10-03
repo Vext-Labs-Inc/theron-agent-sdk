@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const rulePath = resolve(root, ".cursor/rules/pstack.mdc");
+const rulePath = resolve(root, ".cursor/rules/verification-receipt.mdc");
 const contributingPath = resolve(root, "CONTRIBUTING.md");
 const templatePath = resolve(root, ".github/pull_request_template.md");
 
@@ -15,7 +15,7 @@ function frontmatter(text: string): string {
   return match ? match[1] : "";
 }
 
-describe("PSTACK / Vstack rule file", () => {
+describe("Verification receipt rule file", () => {
   it("exists", () => {
     expect(existsSync(rulePath)).toBe(true);
   });
@@ -30,8 +30,8 @@ describe("PSTACK / Vstack rule file", () => {
     "## Receipts and the claim ceiling",
     "## Where checks run",
     "## Real checks in this repo",
-    "## Keep PSTACK out of product copy",
-    "## Cursor plugin concepts",
+    "## Keep process vocabulary out of product copy",
+    "## No regressions",
   ])("keeps the section heading %s", (heading) => {
     const lines = read(rulePath).split(/\r?\n/);
     expect(lines).toContain(heading);
@@ -39,7 +39,15 @@ describe("PSTACK / Vstack rule file", () => {
 
   it("states the receipt requirements", () => {
     const text = read(rulePath);
-    for (const term of ["Exact command", "pass / fail / skipped / total", "no live surface touched", "Rollback"]) {
+    for (const term of [
+      "Exact command",
+      "pass / fail / skipped / total",
+      "the expected number is 0",
+      "no live surface touched",
+      "Rollback",
+      "One orchestrator owns the task",
+      "Prove it works",
+    ]) {
       expect(text).toContain(term);
     }
     expect(text).toMatch(/GitHub Actions is not the merge gate/);
@@ -54,10 +62,10 @@ describe("PSTACK / Vstack rule file", () => {
 });
 
 describe("CONTRIBUTING pointer", () => {
-  it("has the PSTACK / Vstack section pointing at the rule file", () => {
+  it("has the Verification receipt section pointing at the rule file", () => {
     const text = read(contributingPath);
-    expect(text.split(/\r?\n/)).toContain("## PSTACK / Vstack (default for every agent)");
-    expect(text).toContain(".cursor/rules/pstack.mdc");
+    expect(text.split(/\r?\n/)).toContain("## Verification receipt (default for every agent)");
+    expect(text).toContain(".cursor/rules/verification-receipt.mdc");
   });
 });
 
@@ -65,13 +73,14 @@ describe("PR template receipt block", () => {
   it("exists with the receipt checklist fields", () => {
     expect(existsSync(templatePath)).toBe(true);
     const text = read(templatePath);
-    expect(text).toContain("## PSTACK / Vstack receipt");
+    expect(text).toContain("## Verification receipt");
     for (const field of [
       "Lane / orchestrator",
       "Claim ceiling",
       "Blast radius",
       "Test counts before",
       "Test counts after",
+      "Tests deleted or skipped",
       "Rollback",
     ]) {
       expect(text).toContain(`**${field}`);

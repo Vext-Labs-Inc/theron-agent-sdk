@@ -40,9 +40,9 @@ Every PR should:
 
 For new primitives, the bar is higher: open an issue first to discuss before opening a PR. The five primitives (Agent, Council, Session, Memory, Tool) are the public surface; adding a sixth requires consensus.
 
-## PSTACK / Vstack (default for every agent)
+## Verification receipt (default for every agent)
 
-Every agent working in this repo follows [`.cursor/rules/pstack.mdc`](.cursor/rules/pstack.mdc): one orchestrator, narrow lanes, and every non-trivial unit ends in a check. The receipt ceiling: no done, green, or LIVE claim without the exact command and its real output, full test counts (pass / fail / skipped / total) before and after, a before/after for any live surface (or "no live surface touched"), and a rollback note. Checks can run locally in any editor or in Cursor, with receipts in the PR body; GitHub Actions is not the merge gate. You do not need Cursor to contribute. The "PSTACK / Vstack receipt" block of the PR template is optional for external contributors; maintainers complete it.
+Every agent working in this repo follows [`.cursor/rules/verification-receipt.mdc`](.cursor/rules/verification-receipt.mdc): one orchestrator, parallel lanes only where work can truly move in parallel, and every non-trivial unit ends in a check. Prove it works: no done, green, or LIVE claim without the exact command and its real output, full test counts (pass / fail / skipped / total) before and after with 0 tests deleted or skipped, a before/after for any live surface (or "no live surface touched"), and a rollback note. Checks can run locally in any editor or in Cursor, with receipts in the PR body; GitHub Actions is not the merge gate. You do not need Cursor to contribute. The "Verification receipt" block of the PR template is optional for external contributors; maintainers complete it.
 
 ## Code style
 
