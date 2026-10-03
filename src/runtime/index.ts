@@ -28,6 +28,25 @@ export type RunnerEvent =
   | { type: "aborted"; agent: string }
   | { type: "error"; agent: string; message: string };
 
+/** A tool call the model requested. `id` is the upstream tool_call id when the provider sends one. */
+export interface ModelToolCall {
+  id?: string;
+  name: string;
+  input: unknown;
+}
+
+/**
+ * A message in the conversation the Runner sends to the adapter.
+ *
+ * An assistant turn that requested tools carries `tool_calls` (each with an
+ * `id`), and every tool result carries the `tool_call_id` it answers.
+ * OpenAI-style servers reject a tool message without one.
+ */
+export type ModelMessage =
+  | { role: "system" | "user"; content: string }
+  | { role: "assistant"; content: string; tool_calls?: Array<ModelToolCall & { id: string }> }
+  | { role: "tool"; content: string; tool_call_id: string; name?: string };
+
 /**
  * Model adapter — the function the Runner calls to talk to an LLM.
  *
@@ -41,16 +60,19 @@ export interface ModelAdapter {
   /** Chat completion. Streams deltas via the optional `onDelta` callback. */
   chat(opts: {
     model: string;
-    messages: Array<{ role: "system" | "user" | "assistant" | "tool"; content: string }>;
+    messages: ModelMessage[];
     tools?: Array<{ name: string; description: string; input_schema: Record<string, unknown> }>;
+    /** Sent only when set. */
     max_tokens?: number;
+    /** Sent only when set. */
     temperature?: number;
     onDelta?: (delta: string) => void;
     /** Cancellation signal — adapters should forward it to fetch(). */
     signal?: AbortSignal;
   }): Promise<{
     content: string;
-    tool_calls?: Array<{ name: string; input: unknown }>;
+    /** Return the upstream `id` on each call so tool results can reference it. */
+    tool_calls?: ModelToolCall[];
     tokens: { input: number; output: number };
     /** Optional per-call cost in USD. Adapters that can compute it should set
      *  it so AgentResult.cost_usd and the costUsdAtLeast stop-predicate work. */
@@ -134,7 +156,7 @@ export class Runner {
     const signal = opts?.signal;
     this.emit({ type: "agent_start", agent: agent.name, query });
 
-    const messages: Array<{ role: "system" | "user" | "assistant" | "tool"; content: string }> = [
+    const messages: ModelMessage[] = [
       { role: "system", content: agent.instruction.system },
     ];
     for (const ex of agent.instruction.examples ?? []) {
@@ -173,9 +195,13 @@ export class Runner {
         // routinely emit several tool calls per turn and they are independent,
         // so execute them concurrently and append results in call order (the
         // protocol requires the tool messages follow the assistant message in
-        // a stable order).
-        messages.push({ role: "assistant", content: response.content });
-        const calls = response.tool_calls;
+        // a stable order). Adapters that report no id get a synthesized one so
+        // each tool result can still name the call it answers.
+        const calls = response.tool_calls.map((call, i) => ({
+          ...call,
+          id: call.id ?? `call_${turn}_${i}`,
+        }));
+        messages.push({ role: "assistant", content: response.content, tool_calls: calls });
         const results = await Promise.all(
           calls.map(async (call) => {
             // Delegate-to-sub-agent call → recurse into runner.run(subAgent).
@@ -223,7 +249,7 @@ export class Runner {
         );
         for (const r of results) {
           if (r.ok) toolCalls.push({ name: r.call.name, input: r.call.input, output: r.output });
-          messages.push({ role: "tool", content: r.content });
+          messages.push({ role: "tool", content: r.content, tool_call_id: r.call.id, name: r.call.name });
         }
         continue; // model gets to see tool results before producing final answer
       }

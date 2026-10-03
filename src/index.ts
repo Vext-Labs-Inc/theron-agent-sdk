@@ -72,7 +72,14 @@ export type {
 } from "./composer/index.js";
 
 export { Runner } from "./runtime/index.js";
-export type { ModelAdapter, RunnerEvent, RunnerConfig, RunOptions } from "./runtime/index.js";
+export type {
+  ModelAdapter,
+  ModelMessage,
+  ModelToolCall,
+  RunnerEvent,
+  RunnerConfig,
+  RunOptions,
+} from "./runtime/index.js";
 
 export { LocalCloudSession, LocalCloudSessionProvider } from "./runtime/cloud-session.js";
 export type {

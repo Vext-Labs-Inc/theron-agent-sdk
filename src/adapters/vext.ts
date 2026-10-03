@@ -26,8 +26,12 @@
  *   });
  *
  * `model` is required. `council_mode` is sent only when `councilMode` is set.
+ *
+ * Tool calls keep the upstream `id` from both streamed and non-streamed
+ * responses. Assistant turns are sent back with their `tool_calls`, and each
+ * tool result is sent with its `tool_call_id`.
  */
-import type { ModelAdapter } from "../runtime/index.js";
+import type { ModelMessage, ModelToolCall, ModelAdapter } from "../runtime/index.js";
 import { MissingBaseURLError } from "../errors.js";
 
 export { MissingBaseURLError } from "../errors.js";
@@ -61,6 +65,33 @@ function resolveBase(opts: VextAdapterOptions): string {
     configured(readEnv("THERON_BASE_URL"));
   if (!explicit) throw new MissingBaseURLError();
   return explicit.replace(/\/+$/, "");
+}
+
+type WireMessage =
+  | { role: "system" | "user"; content: string }
+  | {
+      role: "assistant";
+      content: string | null;
+      tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
+    }
+  | { role: "tool"; content: string; tool_call_id: string };
+
+function toWire(messages: ModelMessage[]): WireMessage[] {
+  return messages.map((m): WireMessage => {
+    if (m.role === "assistant" && m.tool_calls && m.tool_calls.length > 0) {
+      return {
+        role: "assistant",
+        content: m.content === "" ? null : m.content,
+        tool_calls: m.tool_calls.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: { name: tc.name, arguments: JSON.stringify(tc.input ?? {}) },
+        })),
+      };
+    }
+    if (m.role === "tool") return { role: "tool", content: m.content, tool_call_id: m.tool_call_id };
+    return { role: m.role, content: m.content };
+  });
 }
 
 /** The adapter instance returned by {@link createVextAdapter}. */
@@ -118,7 +149,7 @@ export function createVextAdapter(opts: VextAdapterOptions = {}): VextAdapter {
 
       const body: Record<string, unknown> = {
         model,
-        messages,
+        messages: toWire(messages),
         max_tokens: max_tokens ?? 2048,
         temperature: temperature ?? 0.2,
         stream: !!onDelta,
@@ -163,7 +194,7 @@ export function createVextAdapter(opts: VextAdapterOptions = {}): VextAdapter {
         let inputTokens = 0;
         let outputTokens = 0;
         let buf = "";
-        const toolAcc: Record<number, { name: string; args: string }> = {};
+        const toolAcc: Record<number, { id?: string; name: string; args: string }> = {};
         for (;;) {
           const { value, done } = await reader.read();
           if (done) break;
@@ -185,9 +216,14 @@ export function createVextAdapter(opts: VextAdapterOptions = {}): VextAdapter {
               // Accumulate streamed tool_calls (OpenAI sends them as indexed fragments). Without this,
               // every tool-using agent is broken: the model asks to call a tool and the SDK drops it.
               if (Array.isArray(d?.tool_calls)) {
-                for (const tc of d.tool_calls as Array<{ index?: number; function?: { name?: string; arguments?: string } }>) {
+                for (const tc of d.tool_calls as Array<{
+                  index?: number;
+                  id?: string;
+                  function?: { name?: string; arguments?: string };
+                }>) {
                   const i = typeof tc.index === "number" ? tc.index : 0;
                   (toolAcc[i] ??= { name: "", args: "" });
+                  if (tc.id) toolAcc[i].id = tc.id;
                   if (tc.function?.name) toolAcc[i].name = tc.function.name;
                   if (tc.function?.arguments) toolAcc[i].args += tc.function.arguments;
                 }
@@ -202,7 +238,11 @@ export function createVextAdapter(opts: VextAdapterOptions = {}): VextAdapter {
           }
         }
         const tool_calls = Object.keys(toolAcc).length
-          ? Object.values(toolAcc).map((t) => ({ name: t.name, input: safeJson(t.args) }))
+          ? Object.values(toolAcc).map((t): ModelToolCall => ({
+              ...(t.id ? { id: t.id } : {}),
+              name: t.name,
+              input: safeJson(t.args),
+            }))
           : undefined;
         return { content, tool_calls, tokens: { input: inputTokens, output: outputTokens } };
       }
@@ -210,12 +250,16 @@ export function createVextAdapter(opts: VextAdapterOptions = {}): VextAdapter {
       // Non-streaming path.
       const json = (await res.json()) as {
         choices: Array<{
-          message: { content: string; tool_calls?: Array<{ function: { name: string; arguments: string } }> };
+          message: {
+            content: string | null;
+            tool_calls?: Array<{ id?: string; function: { name: string; arguments: string } }>;
+          };
         }>;
         usage?: { prompt_tokens?: number; completion_tokens?: number };
       };
       const msg = json.choices?.[0]?.message ?? { content: "" };
-      const tool_calls = msg.tool_calls?.map((tc) => ({
+      const tool_calls = msg.tool_calls?.map((tc): ModelToolCall => ({
+        ...(tc.id ? { id: tc.id } : {}),
         name: tc.function.name,
         input: safeJson(tc.function.arguments),
       }));
