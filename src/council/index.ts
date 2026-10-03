@@ -37,7 +37,7 @@ export interface CouncilOutput {
  *
  * Two kinds:
  *   - Deterministic reconcilers (regex / SMT / voting) — fast, cheap, no LLM
- *   - LLM reconcilers (JUWEL-Reconciler-D or another model) — better synthesis,
+ *   - LLM reconcilers (Theron-Reconciler-D or another model) — better synthesis,
  *     more expensive
  *
  * The default is a deterministic claim-merging reconciler.

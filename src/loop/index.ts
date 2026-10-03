@@ -183,13 +183,13 @@ export interface RatchetDecision {
  *   - An absent verdict is treated as hold, not as pass — absence of proof is
  *     not proof of absence.
  *
- * This matches JUWEL's own server-side CIP loop, where weight commits require
+ * This matches Theron's own server-side CIP loop, where weight commits require
  * a verifier pass + confidence >= threshold before the ratchet clicks forward.
  */
 export type Ratchet = (v: RatchetVerdict | undefined) => RatchetDecision;
 
 /**
- * verifiedRatchet — the canonical JUWEL loop gate.
+ * verifiedRatchet — the canonical Theron loop gate.
  *
  * Returns a Ratchet that advances ONLY when:
  *   1. A verdict is present (not undefined).
