@@ -39,6 +39,8 @@ const fromEnv = new Runner({
 
 There is no hosted default. Requires Node 20+. Swap in Anthropic, OpenAI, or your own endpoint by writing a `ModelAdapter`.
 
+The ESM and CJS builds each export their own `MissingBaseURLError` class, so `instanceof` only matches the build you imported. If both builds can load in one process, check `err.name === "MissingBaseURLError"` instead.
+
 ---
 
 ## 15-line Council
@@ -163,7 +165,7 @@ const { answer, consistency } = await selfConsistency({
 ```
 
 See [`examples/reasoning-patterns.ts`](examples/reasoning-patterns.ts) for all
-five run end-to-end (offline, no API key).
+seven patterns plus `measureLift` run end-to-end (offline, no API key).
 
 ## How this compares
 
@@ -217,20 +219,23 @@ a `ReceiptSigner` to attach an ES256 / Ed25519 / HMAC detached signature.
 
 ## Runnable examples
 
-The SDK ships with runnable examples in `examples/`. Examples ship as `.ts` only.
-They are not package exports: importing
+The SDK ships with runnable examples in `examples/`. The agent examples call
+openrouter.ai and need `OPENROUTER_API_KEY` plus network access; their tools are
+mocked. `basic-agent.ts` instead posts to `<THERON_BASE_URL>/api/theron-chat-phased`
+on an endpoint you provide. The pattern and loop examples run fully offline with
+no key.
+
+Examples ship as `.ts` only. They are not package exports: importing
 `@vextlabs/theron-agent-sdk/examples/adapters/openrouter.js` throws
 `ERR_PACKAGE_PATH_NOT_EXPORTED`. Run them from this repo with a relative import
-such as `./adapters/openrouter.js` (tsx resolves the `.ts` file). None require
-external network credentials. The agent examples mock every tool so they run
-offline, and the pattern/loop examples are fully offline (no key at all).
+such as `./adapters/openrouter.js` (tsx resolves the `.ts` file).
 
 | Example | What it shows |
 |---|---|
 | `cyber-recon-bot.ts` | Multi-tool recon chain (subdomains → ports → TLS → tech). Every tool call emits a receipt. |
 | `meeting-prep-bot.ts` | Calendar + docs + memory composition; produces a one-page meeting brief. |
 | `support-triage-bot.ts` | Three-specialist Council (classifier + retriever + writer); routing decision emitted as a signable receipt. |
-| `reasoning-patterns.ts` | All five reasoning patterns end-to-end (self-consistency, best-of-N, self-refine, tree-of-thoughts, chain-of-verification). **No key. Fully offline.** |
+| `reasoning-patterns.ts` | All seven reasoning patterns end-to-end (self-consistency, best-of-N, self-refine, tree-of-thoughts, chain-of-verification, mixture-of-agents, reflexion), plus `measureLift`. **No key. Fully offline.** |
 | `loop-primitives.ts` | Verified ratchet, `runImprovementCycle`, and verifier-in-the-loop stop predicates. **No key. Fully offline.** |
 
 ```sh
@@ -247,16 +252,24 @@ npx tsx examples/loop-primitives.ts
 This package is the framework. It is intentionally NOT:
 
 - A pre-trained model. Bring your own (OpenRouter / OpenAI / Anthropic / your own OSS base)
-- A pre-built agent fleet. There are 3 sample agents in `examples/` to show you how to build, then you build your own
+- A pre-built agent fleet. There are 11 runnable examples in `examples/`, 9 of them sample agents, to show you how to build, then you build your own
 - A hosted runtime. Run it on your own infra (Node, Bun, Deno, serverless, container)
 
 ## Documentation
 
-- [Docs site](https://github.com/Vext-Labs-Inc/theron-agent-sdk#readme)
-- [Architecture](./docs/architecture.md)
-- [API reference](./docs/api.md)
-- [Migration guide (from LangChain / CrewAI / AutoGen)](./docs/migration.md)
-- [Stoa cap protocol](https://github.com/Vext-Labs-Inc/stoa)
+- [README](https://github.com/Vext-Labs-Inc/theron-agent-sdk#readme)
+- [Changelog and migration notes](CHANGELOG.md)
+- [Security policy](SECURITY.md)
+- API reference: run `npm run docs` to generate it locally with TypeDoc.
+
+## Tests
+
+```sh
+npm ci
+npm test
+```
+
+The suite has 220 tests (Vitest).
 
 ## More from Vext Labs
 

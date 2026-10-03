@@ -1,9 +1,9 @@
 /**
- * OpenRouter ModelAdapter — works against 200+ models for free-tier users.
+ * OpenRouter ModelAdapter for the sample agents.
  *
- * Used by the sample agents in the SDK. Production users should write their
- * own adapter for their preferred provider (OpenAI direct, Anthropic, Vext
- * managed Theron, etc.).
+ * Calls OpenRouter's OpenAI-compatible chat completions API at openrouter.ai.
+ * Requires an OpenRouter API key, read by the examples from OPENROUTER_API_KEY.
+ * For other providers, write your own ModelAdapter.
  */
 import type { ModelAdapter } from "../../src/runtime/index.js";
 

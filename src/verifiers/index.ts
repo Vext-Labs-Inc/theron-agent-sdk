@@ -9,7 +9,7 @@
 //   - arithmetic recheck
 //   - citation presence
 //
-// Verifier kernels are the primitive nobody else ships as first-class.
+// Each kernel is a small deterministic checker that runs on agent output.
 
 export interface VerifierIssue {
   /** Which verifier kernel raised this. */

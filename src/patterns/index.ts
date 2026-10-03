@@ -3,9 +3,8 @@
 // JUWEL's server-side Hive runs these as loops; this module generalizes them
 // for ANY SDK user, on ANY provider. Each primitive takes provider-agnostic
 // async functions (generate / score / verify / critique) and returns a typed,
-// auditable result. No public agent SDK ships verifier/score-gated reasoning
-// patterns — self-consistency voting, verifier-guided best-of-N, iterative
-// self-refine — as first-class composable primitives; these do.
+// auditable result. The patterns include self-consistency voting,
+// verifier-guided best-of-N, and iterative self-refine.
 //
 // Pure orchestration: no network, no model lock-in, no global state. Deterministic
 // given deterministic inputs (no Math.random), so they are trivially testable.
@@ -311,10 +310,9 @@ export async function mixtureOfAgents(opts: MixtureOfAgentsOptions): Promise<Mix
 }
 
 // ── measureLift: does a pattern/loop actually beat the baseline? ──────────────
-// The empirical backbone of "the system is the moat, not raw scale": prove a
-// pattern helps by MEASURING its score lift over a single-shot baseline on a
-// task set, rather than asserting it. Pure + deterministic given deterministic
-// inputs — no benchmark framework required.
+// Measures a pattern's score lift over a single-shot baseline on a task set,
+// so a claim that the pattern helps can be checked. Pure and deterministic
+// given deterministic inputs. No benchmark framework required.
 
 export interface MeasureLiftOptions<Task> {
   /** The evaluation task set. */

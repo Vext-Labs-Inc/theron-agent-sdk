@@ -1,14 +1,17 @@
 /**
- * JUWEL account — token provider for the Theron adapter.
+ * JUWEL account token resolver. Opt-in only.
  *
- * One JUWEL account, every surface. Rather than pasting an API key, a user can
- * `juwel login` (from the CLI / VS Code / MCP) which runs the browserless
- * device-code flow and stores a scoped `jak_` bearer at ~/.juwel/config.json.
- * This helper lets the SDK pick that token up automatically so an agent you
- * build authenticates as the signed-in JUWEL account with no extra config.
+ * `theronAdapter` does not call this function on its own and never attaches
+ * this token implicitly. To use it, pass it as `tokenProvider` together with
+ * an explicit endpoint (`baseURL`, `base`, or `THERON_BASE_URL`). Without an
+ * endpoint the adapter throws `MissingBaseURLError` before any network call.
+ * An explicit `apiKey` takes precedence over `tokenProvider`.
  *
- * Resolution here is: JUWEL_TOKEN env override, then ~/.juwel/config.json.
- * Node-only: on edge / browser runtimes (no node:fs) it returns undefined.
+ *   theronAdapter({ baseURL: "https://your-endpoint.example", tokenProvider: resolveJuwelToken })
+ *
+ * Resolution order: the JUWEL_TOKEN env var, then the `token` field of
+ * ~/.juwel/config.json. Returns undefined when neither is set, when the file
+ * is missing or malformed, or on runtimes without node:fs (edge, browser).
  */
 
 /** Resolve the JUWEL device token: env override, then ~/.juwel/config.json.
