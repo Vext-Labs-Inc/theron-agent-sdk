@@ -71,7 +71,7 @@ export interface ReceiptSink {
 }
 
 /** A signer turns an unsigned receipt into a signed one. Implementations:
- *  ES256 (default Stoa scheme), Ed25519, HMAC-SHA256 (for internal flows). */
+ *  ES256, Ed25519, or HMAC-SHA256. */
 export interface ReceiptSigner {
   algorithm: "ES256" | "Ed25519" | "HMAC-SHA256" | string;
   issuer: string;
@@ -204,7 +204,7 @@ export function fileReceiptSink(path: string): ReceiptSink {
 }
 
 /**
- * HTTP sink — POSTs each receipt to a Stoa-conformant sink URL. The URL must
+ * HTTP sink: POSTs each receipt as JSON to the sink URL you provide. The URL must
  * accept `application/json` and return 2xx on accept.
  */
 export function httpReceiptSink(opts: {

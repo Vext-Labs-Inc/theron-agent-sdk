@@ -126,7 +126,7 @@ export const LOCAL_TOOL_NAMES: readonly string[] = [
 /**
  * Tools that can mutate the user's machine.
  *
- * Surfaces that add their own tools (e.g. CLI's Stoa, which hits a real SaaS)
+ * Surfaces that add their own tools (for example, one that calls an external service)
  * should extend this set locally rather than modifying it here.
  */
 export const MUTATING_LOCAL_TOOLS: ReadonlySet<string> = new Set([
