@@ -82,7 +82,14 @@ export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
       }
       if (bearer) headers.Authorization = `Bearer ${bearer}`;
 
-      const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+      // `redirect: "error"` refuses to follow a 3xx, including under fetch
+      // polyfills whose default is to follow and replay Authorization.
+      const res = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        redirect: "error",
+      });
       if (!res.ok) {
         throw new Error(`Theron ${res.status} (${url}): ${(await res.text().catch(() => "")).slice(0, 500)}`);
       }
