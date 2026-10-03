@@ -1,34 +1,46 @@
-# JUWEL Agent SDK
+# Vext SDK
 
 > Build agents that work, with receipts you can verify. Any model. MIT.
 
-[![npm](https://img.shields.io/npm/v/@vextlabs/theron-agent-sdk.svg)](https://www.npmjs.com/package/@vextlabs/theron-agent-sdk)
+[![npm](https://img.shields.io/npm/v/@vextlabs/sdk.svg)](https://www.npmjs.com/package/@vextlabs/sdk)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org/)
 [![tests](https://img.shields.io/badge/tests-64%20passing-brightgreen.svg)](#tests)
 
 ```sh
-npm install @vextlabs/theron-agent-sdk
+npm i @vextlabs/sdk
+```
+
+Bring your own endpoint (any OpenAI-compatible URL). There is no hosted default. Pass `baseURL`, or set `VEXT_BASE_URL` (`THERON_BASE_URL` is a deprecated fallback; `VEXT_BASE_URL` wins when both are set).
+
+```sh
+export VEXT_BASE_URL=https://your-endpoint.example
+export VEXT_API_KEY=...
 ```
 
 ```ts
-import { Agent, Runner } from "@vextlabs/theron-agent-sdk";
-import { openrouterAdapter } from "@vextlabs/theron-agent-sdk/examples/adapters/openrouter.js";
+import { Agent, Runner, createVextAdapter } from "@vextlabs/sdk";
 
 const agent = new Agent({ name: "helper", instruction: "Answer helpfully." });
-const runner = new Runner({ model: openrouterAdapter({ apiKey: process.env.OPENROUTER_API_KEY! }), default_model: "openai/gpt-4o-mini" });
+const runner = new Runner({
+  model: createVextAdapter({
+    baseURL: process.env.VEXT_BASE_URL,
+    apiKey: process.env.VEXT_API_KEY,
+  }),
+  default_model: "your-model",
+});
 const result = await runner.run(agent, "What's 2+2?");
 console.log(result.output);
 ```
 
-That is a runnable agent in five lines. Requires Node 20+. An `OPENROUTER_API_KEY` gets you 200+ models through one adapter; swap in Anthropic, OpenAI, or your own OSS endpoint by writing a 30-line `ModelAdapter`.
+That is a runnable agent in a few lines. Requires Node 20+. `createVextAdapter` posts to `<baseURL>/api/v1/chat/completions`. Swap in Anthropic, OpenAI, or another endpoint by writing a `ModelAdapter`. `theronAdapter` and `import "@vextlabs/sdk/adapters/theron"` still work; they are deprecated aliases of `createVextAdapter` and `@vextlabs/sdk/adapters/vext`.
 
 ---
 
 ## 15-line Council
 
 ```ts
-import { Agent, Council, Runner, VerifierKernels } from "@vextlabs/theron-agent-sdk";
+import { Agent, Council, Runner, VerifierKernels } from "@vextlabs/sdk";
 
 const engineer = new Agent({ name: "engineer", instruction: "Answer from a backend reliability perspective." });
 const security = new Agent({ name: "security", instruction: "Answer from a threat-model perspective." });
@@ -46,9 +58,9 @@ console.log(result.consensus);          // "ratified" | "split" | "refuted"
 console.log(result.disagreements);      // surfaced if specialists disagreed
 ```
 
-## Why JUWEL
+## Why Vext
 
-| | JUWEL Agent SDK | Claude Agent SDK | OpenAI Assistants | Vercel AI SDK |
+| | Vext SDK | Claude Agent SDK | OpenAI Assistants | Vercel AI SDK |
 |---|---|---|---|---|
 | Multi-specialist deliberation | First-class `Council` primitive with deterministic reconciliation | Sub-agents, you write the deliberation loop | Single assistant, you wire fan-out | Single model, you wire fan-out |
 | Output verification before return | Built-in `VerifierKernels` (em-dash, AI-ism, arithmetic, citation) plus `defineVerifier` | Hooks pattern, you implement the checkers | None built-in | None built-in |
@@ -56,7 +68,7 @@ console.log(result.disagreements);      // surfaced if specialists disagreed
 
 The receipt chain is the differentiator. Every tool call, every Council vote, every output emits a content-hashed receipt you can sign with your own key and anchor in a daily Merkle root. When someone asks "did an AI do this," you hand them a document, not a vibe.
 
-The SDK is model-agnostic. The verifier kernels and the receipt chain work the same whether you point at OpenRouter, Anthropic, OpenAI, a local Ollama, or the hosted JUWEL substrate.
+The SDK is model-agnostic. The verifier kernels and the receipt chain work the same whether you point at OpenRouter, Anthropic, OpenAI, a local Ollama, or any other OpenAI-compatible URL.
 
 ## The five primitives
 
@@ -76,7 +88,7 @@ Plus:
 
 ## Why a Council?
 
-Every other agent framework binds to a model name string (`gpt-4o`, `claude-3-5-sonnet`). JUWEL Agent SDK binds to a Council of N specialists who deliberate and produce a reconciled answer.
+Every other agent framework binds to a model name string (`gpt-4o`, `claude-3-5-sonnet`). The Vext SDK binds to a Council of N specialists who deliberate and produce a reconciled answer.
 
 ```ts
 // Standard agent — one model decides
@@ -88,16 +100,14 @@ const out = await runner.runCouncil(council, "Review this PR for security risks"
 // or out.consensus === "split"   — disagreements surfaced (don't hide them — show them to the user)
 ```
 
-**The Council primitive doesn't require Vext's managed substrate.** You can run a Council of three generic OpenRouter agents and the SDK handles the deliberation + verifier dispatch + reconciliation locally.
-
-When you upgrade to Vext-managed JUWEL, the same Council code points at our 15 trained Layer-1 LoRA specialists — same SDK surface, dramatically better per-domain output.
+**The Council primitive runs locally.** You can run a Council of three generic agents and the SDK handles the deliberation, verifier dispatch, and reconciliation on your side. Point `createVextAdapter` at any OpenAI-compatible URL when you want a remote model.
 
 ## Verifier kernels: fast, deterministic, free
 
 Verifier kernels are NOT another LLM call. They're small typed checkers that run after your agent produces output:
 
 ```ts
-import { VerifierKernels, defineVerifier } from "@vextlabs/theron-agent-sdk";
+import { VerifierKernels, defineVerifier } from "@vextlabs/sdk";
 
 // Built-in kernels
 VerifierKernels.emDash         // block em-dashes (AI tell)
@@ -124,7 +134,7 @@ Every kernel runs in milliseconds. Pure regex / arithmetic / hash-equal. **No ad
 ## Reasoning patterns & loop primitives
 
 Framework- and provider-agnostic primitives for verifier/score-gated reasoning —
-the SDK-side counterparts of JUWEL's server Hive loops. Each takes plain async
+the SDK-side counterparts of the server-side hive loops. Each takes plain async
 functions (`generate` / `score` / `verify` / `critique`), so they work on any
 model and compose anywhere. No other public agent SDK ships these as first-class
 typed primitives.
@@ -144,7 +154,7 @@ import {
   runImprovementCycle,
   compactHistory,     // summarize-and-continue: run far past the context window
   runUntil,           // bounded, checkpointable long-horizon driver (run soo long)
-} from "@vextlabs/theron-agent-sdk";
+} from "@vextlabs/sdk";
 
 const { answer, consistency } = await selfConsistency({
   samples: 5,
@@ -157,7 +167,7 @@ five run end-to-end (offline, no API key).
 
 ## How this compares
 
-| | JUWEL Agent SDK | Hermes-Agent | Claude Agent SDK | Google ADK | LangGraph |
+| | Vext SDK | Hermes-Agent | Claude Agent SDK | Google ADK | LangGraph |
 |---|---|---|---|---|---|
 | License | **MIT** | MIT | Apache 2.0 | Apache 2.0 | MIT |
 | Multi-agent / Council | **First-class primitive with reconciler** | Sub-agents | Sub-agents | Multi-agent patterns | Supervisor / swarm |
@@ -166,7 +176,7 @@ five run end-to-end (offline, no API key).
 | Tool typing | **Zod schemas, validated I/O** | Function decorators | Pydantic schemas | Pydantic | Pydantic |
 | Model-agnostic | **Yes — any OpenAI-compatible endpoint** | Yes — 200+ via OpenRouter | Claude-optimized | Gemini-optimized | Yes |
 | Signed integrations | **Stoa cap protocol (ES256 receipts + Merkle anchor)** | MCP (no integrity) | MCP | MCP | Custom |
-| Managed substrate path | [Vext JUWEL — 15-specialist Council + per-tenant LoRA tuning](https://theron.tryvext.com) | Nous Portal | Anthropic API | Vertex AI | LangGraph Cloud |
+| Managed substrate path | Bring your own endpoint (any OpenAI-compatible URL) | Nous Portal | Anthropic API | Vertex AI | LangGraph Cloud |
 
 We're not trying to beat Hermes-Agent on community size or Claude Agent SDK on Claude-specific polish. We're shipping the three primitives nobody else ships first-class: **Council + Verifier kernels + Signed integrations.** Plus the optional managed substrate where you get our trained specialists.
 
@@ -179,13 +189,13 @@ sink, but the SDK runs offline with an in-memory sink for tests.
 ```ts
 import {
   ReceiptEmitter, InMemoryReceiptSink, fileReceiptSink, httpReceiptSink,
-} from "@vextlabs/theron-agent-sdk";
+} from "@vextlabs/sdk";
 
 const receipts = new ReceiptEmitter({
   sinks: [
     new InMemoryReceiptSink(),
     fileReceiptSink("./receipts.jsonl"),
-    httpReceiptSink({ url: "https://stoa.tryvext.com/sink", token: process.env.STOA }),
+    httpReceiptSink({ url: "https://receipts.example/sink", token: process.env.STOA }),
   ],
   issuer: "did:web:acme.com",
   actor: "support-triage-bot",
@@ -237,7 +247,7 @@ This package is the framework. It is intentionally NOT:
 - A pre-built agent fleet — there are 3 sample agents in `examples/` to show you how to build, then you build your own
 - A hosted runtime — run it on your own infra (Node, Bun, Deno, serverless, container)
 
-If you want the trained 15-specialist Council, the 450+ curated industry-pack worker agents, the auto-improving Meta agents, or per-tenant overnight LoRA tuning — that's [Vext's managed JUWEL](https://theron.tryvext.com). The SDK is free; the substrate is the product.
+If you want trained specialists or per-tenant tuning, that is Vext's managed product, separate from this package. The SDK is free. Bring your own endpoint (any OpenAI-compatible URL).
 
 ## Documentation
 
@@ -249,7 +259,7 @@ If you want the trained 15-specialist Council, the 450+ curated industry-pack wo
 
 ## More from Vext Labs
 
-The SDK is one corner of a larger surface. The full picture lives on the Vext Labs organization page: [github.com/Vext-Labs-Inc](https://github.com/Vext-Labs-Inc). JUWEL the product is at [theron.tryvext.com](https://theron.tryvext.com).
+The SDK is one corner of a larger surface. The full picture lives on the Vext Labs organization page: [github.com/Vext-Labs-Inc](https://github.com/Vext-Labs-Inc). Company site: [tryvext.com](https://tryvext.com).
 
 ## Contributing
 

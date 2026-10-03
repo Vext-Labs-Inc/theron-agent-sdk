@@ -1,6 +1,6 @@
 // Canonical shared contract for the LOCAL tool runtime (CLI + VS Code).
 //
-// Both packages/theron-cli and packages/theron-vscode define the same 7 local
+// Both the CLI package and the editor package define the same 7 local
 // tools (Read, Write, Edit, Bash, Glob, Grep, LS) with structurally identical
 // JSON-Schema `parameters`. The only divergences are surface-specific wording:
 // the tool-level prose `description` strings, the confirm-policy field name, and
@@ -32,7 +32,7 @@ export interface LocalToolDef {
 /**
  * Canonical JSON-Schema `parameters` objects for the 7 shared local tools.
  *
- * These are copied verbatim from both theron-cli and theron-vscode (the
+ * These are copied verbatim from both the CLI and the editor (the
  * parameters blocks are identical across those two packages). Do NOT add
  * surface-specific prose here — descriptions live per-surface.
  */

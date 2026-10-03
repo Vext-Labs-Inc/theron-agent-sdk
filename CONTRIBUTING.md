@@ -1,4 +1,4 @@
-# Contributing to Theron Agent SDK
+# Contributing to the Vext SDK
 
 Thanks for considering a contribution. The SDK is MIT-licensed and built to grow with the community.
 
@@ -72,7 +72,7 @@ Releases are tagged via `git tag v0.X.Y && git push --tags`. Maintainers cut rel
 
 - General questions: open a Discussion on GitHub
 - Bugs: open an Issue
-- Vext managed Theron / hosted runtime / enterprise: `info@tryvext.com`
+- Vext managed product / enterprise: `info@tryvext.com`
 - Security: `security@tryvext.com`
 
 ---

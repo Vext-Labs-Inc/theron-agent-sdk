@@ -13,7 +13,7 @@
 //   - Confidence is explicit and required — not a subjective LLM self-report.
 //   - The decision is typed and auditable; every advance/hold carries a reason.
 //
-// This mirrors the server-side Agent R&D Loop shipped in JUWEL's own
+// This mirrors the server-side Agent R&D Loop shipped in Vext's own
 // continual-improvement pipeline (CIP) where weight updates are committed only
 // on verified ratchet passes.
 
@@ -183,13 +183,13 @@ export interface RatchetDecision {
  *   - An absent verdict is treated as hold, not as pass — absence of proof is
  *     not proof of absence.
  *
- * This matches Theron's own server-side CIP loop, where weight commits require
+ * This matches the server-side improvement loop, where weight commits require
  * a verifier pass + confidence >= threshold before the ratchet clicks forward.
  */
 export type Ratchet = (v: RatchetVerdict | undefined) => RatchetDecision;
 
 /**
- * verifiedRatchet — the canonical Theron loop gate.
+ * verifiedRatchet — the canonical loop gate.
  *
  * Returns a Ratchet that advances ONLY when:
  *   1. A verdict is present (not undefined).

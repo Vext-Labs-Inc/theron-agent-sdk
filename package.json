@@ -1,5 +1,5 @@
 {
-  "name": "@vextlabs/theron-agent-sdk",
+  "name": "@vextlabs/sdk",
   "version": "0.4.1",
   "description": "Open-source agent SDK with a Council of specialists, deterministic verifier kernels, and Stoa-signed integrations. Build any agent against any model. From Vext Labs.",
   "license": "MIT",
@@ -22,7 +22,7 @@
     "stoa",
     "lora",
     "domain-specialists",
-    "theron",
+    "vext",
     "vext-labs",
     "open-source",
     "self-improving",
@@ -84,10 +84,15 @@
       "import": "./dist/receipts/index.js",
       "require": "./dist/receipts/index.cjs"
     },
+    "./adapters/vext": {
+      "types": "./dist/adapters/vext.d.ts",
+      "import": "./dist/adapters/vext.js",
+      "require": "./dist/adapters/vext.cjs"
+    },
     "./adapters/theron": {
-      "types": "./dist/adapters/theron.d.ts",
-      "import": "./dist/adapters/theron.js",
-      "require": "./dist/adapters/theron.cjs"
+      "types": "./dist/adapters/vext.d.ts",
+      "import": "./dist/adapters/vext.js",
+      "require": "./dist/adapters/vext.cjs"
     },
     "./loop": {
       "types": "./dist/loop/index.d.ts",

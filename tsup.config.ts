@@ -19,7 +19,7 @@ export default defineConfig({
     "receipts/index": "src/receipts/index.ts",
     "loop/index": "src/loop/index.ts",
     "patterns/index": "src/patterns/index.ts",
-    "adapters/theron": "src/adapters/theron.ts",
+    "adapters/vext": "src/adapters/vext.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

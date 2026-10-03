@@ -5,7 +5,7 @@
 // frontmatter (name, description, optional allowed-tools + model) whose body is
 // the instruction pack injected when the skill is invoked.
 //
-// Both surfaces (theron-cli, theron-vscode) ship a set of built-in skills in
+// Both the CLI and the editor ship a set of built-in skills in
 // code; this loader lets users/teams add their OWN skills by dropping files in
 // `~/.theron/skills/*.md` (global) or `<project>/.theron/skills/*.md`
 // (project-local, takes precedence). File-defined skills override built-ins of

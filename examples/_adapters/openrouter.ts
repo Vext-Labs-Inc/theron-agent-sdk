@@ -2,8 +2,8 @@
  * OpenRouter ModelAdapter — works against 200+ models for free-tier users.
  *
  * Used by the sample agents in the SDK. Production users should write their
- * own adapter for their preferred provider (OpenAI direct, Anthropic, Vext
- * managed Theron, etc.).
+ * own adapter for their preferred provider (OpenAI direct, Anthropic, any
+ * OpenAI-compatible URL, etc.).
  */
 import type { ModelAdapter } from "../../src/runtime/index.js";
 

@@ -1,21 +1,20 @@
 /**
- * basic-agent — 1 tool, calls the hosted Theron endpoint, streams to stdout.
+ * basic-agent — 1 tool, calls an OpenAI-compatible endpoint, streams to stdout.
+ *
+ * Bring your own endpoint (any OpenAI-compatible URL). There is no hosted default.
  *
  * Run:
- *   THERON_API_KEY=... npx tsx examples/basic-agent.ts
+ *   VEXT_BASE_URL=https://your-endpoint.example VEXT_API_KEY=... npx tsx examples/basic-agent.ts
+ *
+ * `THERON_BASE_URL` is a deprecated fallback used only when `VEXT_BASE_URL` is unset.
  *
  * What this shows:
  *   - Define a tool with Zod (defineTool)
  *   - Build a one-line Agent
- *   - Drive it with Runner + theronAdapter against tryvext.com
+ *   - Drive it with Runner + createVextAdapter
  *   - Stream tokens to stdout via runner.on("agent_thinking")
- *
- * The hosted Theron endpoint does not return tool calls today, so the agent
- * answers from the conversation; the tool is included to show the contract.
- * Swap theronAdapter for openrouterAdapter to get real tool-call routing.
  */
-import { Agent, Runner, defineTool, zod as z } from "../src/index.js";
-import { theronAdapter } from "./adapters/theron.js";
+import { Agent, Runner, createVextAdapter, defineTool, zod as z } from "../src/index.js";
 
 const wordCount = defineTool({
   name: "word_count",
@@ -34,12 +33,16 @@ const helper = new Agent({
 });
 
 async function main() {
+  const baseURL = process.env.VEXT_BASE_URL ?? process.env.THERON_BASE_URL;
+  if (!baseURL) {
+    throw new Error("No hosted default endpoint; pass baseURL or set VEXT_BASE_URL");
+  }
   const runner = new Runner({
-    model: theronAdapter({
-      apiKey: process.env.THERON_API_KEY,
-      surface: "marketing",
+    model: createVextAdapter({
+      baseURL,
+      apiKey: process.env.VEXT_API_KEY ?? process.env.THERON_API_KEY,
     }),
-    default_model: "theron",
+    default_model: "your-model",
   });
 
   runner.on((event) => {
@@ -47,7 +50,7 @@ async function main() {
     if (event.type === "agent_output") process.stdout.write("\n");
   });
 
-  await runner.run(helper, "In one sentence, what is the Theron Council?");
+  await runner.run(helper, "In one sentence, what is a council of specialists?");
 }
 
 main().catch((err) => {

@@ -1,7 +1,7 @@
 // Council — N specialists deliberate, verifier kernels check, reconciler
 // produces the final answer.
 //
-// This is JUWEL Agent SDK's flagship primitive. The architecture nobody
+// This is the Vext SDK's flagship primitive. The architecture nobody
 // else ships as a first-class SDK abstraction.
 
 import type { Agent } from "../agent/index.js";
@@ -37,7 +37,7 @@ export interface CouncilOutput {
  *
  * Two kinds:
  *   - Deterministic reconcilers (regex / SMT / voting) — fast, cheap, no LLM
- *   - LLM reconcilers (Theron-Reconciler-D or another model) — better synthesis,
+ *   - LLM reconcilers (a dedicated reconciler model) — better synthesis,
  *     more expensive
  *
  * The default is a deterministic claim-merging reconciler.

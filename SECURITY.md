@@ -11,14 +11,14 @@ We'll acknowledge receipt within 48 hours and aim to provide a fix or remediatio
 ## Scope
 
 In scope:
-- The SDK code in this repository (`@vextlabs/theron-agent-sdk`)
+- The SDK code in this repository (`@vextlabs/sdk`)
 - The sample agents in `examples/`
 - The OpenRouter / OpenAI model adapters shipped here
 
 Out of scope (report to Vext separately):
-- Vext-hosted Theron API (`api.tryvext.com`) — report to `security@tryvext.com` with subject `[hosted]`
+- Vext-managed APIs — report to `security@tryvext.com` with subject `[hosted]`
 - Stoa cap protocol — see [github.com/Vext-Labs-Inc/stoa/SECURITY.md](https://github.com/Vext-Labs-Inc/stoa/SECURITY.md)
-- The proprietary 15 Layer-1 LoRAs, the 450+ Hive agents, the Theron-Base model — separate disclosure channel
+- The proprietary specialist models and agent fleet — separate disclosure channel
 
 ## Threat model
 

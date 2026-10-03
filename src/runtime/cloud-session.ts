@@ -1,4 +1,4 @@
-// CloudSession — the seam behind "Theron on the web" / cloud routines: an
+// CloudSession — the seam behind cloud routines: an
 // isolated, per-session execution environment with a filesystem, where tools
 // run server-side instead of on the user's machine.
 //
@@ -45,15 +45,22 @@ export interface CloudExecOptions {
   /**
    * Extra environment variables for the command. Copied as given, after the
    * inherited allowlist. This is the only way to pass a name that is not on
-   * that allowlist.
+   * that allowlist. The shell does not inherit `HTTP_PROXY`, `HTTPS_PROXY`,
+   * `NO_PROXY`, `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, `npm_config_*`,
+   * `SSH_AUTH_SOCK`, `NVM_*`, `XDG_*`, or `VIRTUAL_ENV`. Set those here when
+   * the command needs them, for example
+   * `env: { HTTPS_PROXY: "http://127.0.0.1:8888", SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK ?? "" }`.
    */
   env?: Record<string, string>;
 }
 
 /**
- * Names copied from `process.env` into a session shell. Everything else in the
- * parent environment is dropped, including `JUWEL_TOKEN` and any name ending in
- * `_TOKEN`, `_KEY`, or `_SECRET`.
+ * Names copied from `process.env` into a session shell. The copy is
+ * allowlist-only: every other parent variable is omitted, and there is no
+ * second deny-list pass. `JUWEL_TOKEN` and names ending in `_TOKEN`, `_KEY`,
+ * or `_SECRET` are absent because they are not on this list. Proxy, CA,
+ * npm, ssh-agent, nvm, XDG, and virtualenv variables are also absent; pass
+ * them through `CloudExecOptions.env`.
  */
 const INHERITED_ENV_KEYS = [
   "PATH",
@@ -72,13 +79,10 @@ const INHERITED_ENV_KEYS = [
   "LOGNAME",
 ] as const;
 
-const SENSITIVE_ENV_NAME = /(_TOKEN|_KEY|_SECRET)$/i;
-
 /** Allowlisted parent env, then the caller's explicit `options.env`. */
 function sessionCommandEnv(extra?: Record<string, string>): Record<string, string> {
   const env: Record<string, string> = {};
   for (const key of INHERITED_ENV_KEYS) {
-    if (SENSITIVE_ENV_NAME.test(key)) continue;
     const value = process.env[key];
     if (typeof value === "string") env[key] = value;
   }
@@ -132,10 +136,13 @@ function resolveInside(root: string, p: string): string {
  * In-process {@link CloudSession} backend: a temp workspace on the host, commands
  * via `/bin/sh -c`. For tests/CI/local dev only — NOT a security boundary.
  *
- * `exec` does not pass the parent `process.env` through. It copies an allowlist
- * (`PATH`, `HOME`, `LANG`, `TERM`, and similar) and then `options.env`.
- * `JUWEL_TOKEN` and names ending in `_TOKEN`, `_KEY`, or `_SECRET` are omitted
- * from the inherited set. A name the caller sets on `options.env` is passed.
+ * `exec` does not pass the parent `process.env` through. The environment is
+ * allowlist-only (`PATH`, `HOME`, `LANG`, `TERM`, and similar locale and temp
+ * variables) and then `options.env` copied as given. Nothing else is inherited,
+ * including `JUWEL_TOKEN`, `*_TOKEN` / `*_KEY` / `*_SECRET`, `HTTP_PROXY`,
+ * `HTTPS_PROXY`, `NO_PROXY`, `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`,
+ * `npm_config_*`, `SSH_AUTH_SOCK`, `NVM_*`, `XDG_*`, and `VIRTUAL_ENV`.
+ * Pass any of those on `options.env` when the command needs them.
  */
 export class LocalCloudSession implements CloudSession {
   readonly id: string;
@@ -193,7 +200,7 @@ export class LocalCloudSession implements CloudSession {
 export class LocalCloudSessionProvider implements CloudSessionProvider {
   async provision(): Promise<CloudSession> {
     const id = randomUUID();
-    const root = await mkdtemp(join(tmpdir(), `theron-session-${id.slice(0, 8)}-`));
+    const root = await mkdtemp(join(tmpdir(), `vext-session-${id.slice(0, 8)}-`));
     return new LocalCloudSession(id, root);
   }
 }

@@ -15,7 +15,7 @@ export interface AgentConfig {
   /** Display name. Used for logging + routing. */
   name: string;
   /** Model identifier. Defaults to whatever the Runner is configured for.
-   *  Examples: "gpt-4o", "claude-3-5-sonnet", "theron-base-v8@cyber". */
+   *  Examples: "gpt-4o", "claude-3-5-sonnet", "your-model". */
   model?: string;
   /** Instructions to the model. Either a string (shorthand for {system: ...})
    *  or a full AgentInstruction object. */
@@ -294,7 +294,7 @@ export async function loadAllMarkdownAgents(projectDir?: string): Promise<Markdo
 // every scalar single-line and quote-safe.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Model tiers for the JUWEL fleet — the single source of truth so bundled and
+/** Model tiers for the bundled fleet — the single source of truth so bundled and
  *  user-authored agents route to the same real upstreams. `fast`/`deep` map to
  *  Sakana Fugu (falls back to OpenRouter fail-open server-side); `reasoning`
  *  picks a chain-of-thought specialist on OpenRouter. Use a tier name OR a raw

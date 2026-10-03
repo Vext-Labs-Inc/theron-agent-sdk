@@ -1,7 +1,7 @@
-// JUWEL Agent SDK — public surface (npm package name remains @vextlabs/theron-agent-sdk).
+// Vext SDK — public surface (npm package @vextlabs/sdk).
 //
 // The minimum import to build an agent:
-//   import { Agent, Council, Tool, Runner } from "@vextlabs/theron-agent-sdk";
+//   import { Agent, Council, Tool, Runner } from "@vextlabs/sdk";
 //
 // Five primitives + the runtime. Everything else is built on these.
 
@@ -85,13 +85,19 @@ export type {
 export { MCPClient, collectMcpTools } from "./mcp/index.js";
 export type { McpServerConfig, McpTool } from "./mcp/index.js";
 
-// First-class JUWEL adapter — drives the Vext-hosted council so agents built
-// with this SDK run on JUWEL's substrate out of the box. Export names `theron` /
-// `theronAdapter` kept for publish API compatibility.
-export { theronAdapter, theron } from "./adapters/theron.js";
-export type { TheronAdapterOptions } from "./adapters/theron.js";
-// JUWEL account token provider — one sign-in (`juwel login`) authenticates the
-// SDK via ~/.juwel/config.json / JUWEL_TOKEN, no BYO key required.
+// Bring your own endpoint (any OpenAI-compatible URL). There is no hosted default.
+// `theronAdapter` / `theron` / `TheronAdapterOptions` are deprecated aliases of
+// the Vext names and are the same references.
+export {
+  MissingBaseURLError,
+  createVextAdapter,
+  vext,
+  theronAdapter,
+  theron,
+} from "./adapters/vext.js";
+export type { VextAdapter, VextAdapterOptions, TheronAdapterOptions } from "./adapters/vext.js";
+// Account token helper. Not attached implicitly: pass it as `tokenProvider`
+// if you want `JUWEL_TOKEN` or ~/.juwel/config.json sent to your base.
 export { resolveJuwelToken } from "./adapters/juwel_auth.js";
 
 export {
