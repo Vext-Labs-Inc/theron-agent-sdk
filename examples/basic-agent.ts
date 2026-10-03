@@ -1,5 +1,5 @@
 /**
- * basic-agent — 1 tool, calls the hosted Theron endpoint, streams to stdout.
+ * basic-agent. One tool. Bring your own endpoint. Streams tokens to stdout.
  *
  * Run:
  *   THERON_API_KEY=... npx tsx examples/basic-agent.ts
@@ -7,10 +7,10 @@
  * What this shows:
  *   - Define a tool with Zod (defineTool)
  *   - Build a one-line Agent
- *   - Drive it with Runner + theronAdapter against tryvext.com
+ *   - Drive it with Runner + theronAdapter. Bring your own endpoint.
  *   - Stream tokens to stdout via runner.on("agent_thinking")
  *
- * The hosted Theron endpoint does not return tool calls today, so the agent
+ * Bring your own endpoint. This sample does not return tool calls, so the agent
  * answers from the conversation; the tool is included to show the contract.
  * Swap theronAdapter for openrouterAdapter to get real tool-call routing.
  */
@@ -36,6 +36,7 @@ const helper = new Agent({
 async function main() {
   const runner = new Runner({
     model: theronAdapter({
+      baseURL: process.env.THERON_BASE_URL ?? "",
       apiKey: process.env.THERON_API_KEY,
       surface: "marketing",
     }),

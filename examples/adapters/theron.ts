@@ -1,15 +1,9 @@
 /**
- * Theron ModelAdapter — talks to the Vext-hosted council at
- * https://tryvext.com/api/theron-chat-phased.
+ * Sample adapter. Pass `baseURL`. There is no default host.
  *
- * Same OpenAI-compatible adapter shape as openrouter.ts. Use this when you
- * want the SDK to drive the Vext Council with its trained specialists and
- * verifier kernels instead of a single foundation model.
- *
- * Tool-calling is NOT yet exposed by the hosted Theron endpoint, so this
- * adapter ignores any `tools` argument and returns only `content` + a
- * synthetic token count. The SDK's tool-call loop is still exercised when
- * you swap in OpenRouter / OpenAI / Anthropic adapters for local dev.
+ * Tool arguments are ignored. The adapter returns content and a
+ * synthetic token count. Swap in another adapter under `examples/adapters`
+ * for tool-call routing during local dev.
  */
 import type { ModelAdapter } from "../../src/runtime/index.js";
 
@@ -21,14 +15,16 @@ type ChatMessage = {
 };
 
 export function theronAdapter(opts: {
-  /** Endpoint base. Defaults to tryvext.com. */
-  base?: string;
-  /** Vext API key, if you have one. Owner key is fine. Optional for OSS demo. */
+  /** Required caller endpoint. No default host. */
+  baseURL: string;
+  /** Vext API key, if you have one. Optional for a local demo. */
   apiKey?: string;
   /** Which surface to advertise. Affects the Theron system prompt. */
   surface?: "marketing" | "theron" | "aeos-personal" | "aeos-company";
 }): ModelAdapter {
-  const base = (opts.base ?? "https://tryvext.com").replace(/\/$/, "");
+  const raw = opts.baseURL.trim();
+  if (!raw) throw new Error("pass baseURL");
+  const base = raw.replace(/\/$/, "");
   return {
     name: "theron",
     async chat({ messages, onDelta }: {

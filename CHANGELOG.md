@@ -15,6 +15,19 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Adapter fetch does not follow redirects.** `theronAdapter` sets `redirect: "error"`, so a 302 or 307 cannot replay `Authorization` to another origin, including under fetch polyfills that follow by default. Cloudflare Workers supports `redirect: "error"` (`follow`, `error`, or `manual`).
 - **Session shells are allowlist-only.** `LocalCloudSession.exec` copies an allowlist from `process.env` (`PATH`, `HOME`, `LANG`, `TERM`, and similar locale and temp variables) and then `options.env`. There is no second deny-list pass. `JUWEL_TOKEN` and names ending in `_TOKEN`, `_KEY`, or `_SECRET` are not inherited. `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, `npm_config_*`, `SSH_AUTH_SOCK`, `NVM_*`, `XDG_*`, and `VIRTUAL_ENV` are not inherited either. Pass any of those through `options.env`.
 
+### Migration
+- Migration: pass baseURL (or set THERON_BASE_URL) and apiKey/tokenProvider; pass resolveJuwelToken as tokenProvider to keep the old token behaviour. `resolveJuwelToken` is exported from the package root and from `./adapters/theron`.
+
+## [0.4.1] - 2026-10-03
+
+### Changed
+- Public source tree synced to the published 0.4.1 package. `package.json` version set to 0.4.1.
+
+## [0.4.0]
+
+### Note
+- This repository has no 0.4.0 commit. History jumps from 0.1.0 to the 0.4.1 source sync.
+
 ## [0.3.2] - 2026-06-27
 
 ### Added

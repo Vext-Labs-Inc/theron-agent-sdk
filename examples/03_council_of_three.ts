@@ -4,8 +4,7 @@
  * Three generic agents (Engineer, Security, Product) deliberate on a question.
  * Outputs are checked by verifier kernels before reconciliation.
  *
- * This is the 15-line Council pattern — the Theron Agent SDK moat in a single
- * example.
+ * This is the 15-line Council pattern in a single example.
  *
  * Run:
  *   OPENROUTER_API_KEY=sk-or-... npx tsx examples/03_council_of_three.ts

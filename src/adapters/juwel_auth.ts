@@ -8,8 +8,7 @@
  * build authenticates as the signed-in JUWEL account with no extra config.
  *
  * Resolution here is: JUWEL_TOKEN env override, then ~/.juwel/config.json.
- * Node-only: on edge / browser runtimes (no node:fs) it returns undefined so
- * the adapter falls through to its existing free-tier / no-auth path.
+ * Node-only: on edge / browser runtimes (no node:fs) it returns undefined.
  */
 
 /** Resolve the JUWEL device token: env override, then ~/.juwel/config.json.

@@ -1,4 +1,4 @@
-// JUWEL Agent SDK — public surface (npm package name remains @vextlabs/theron-agent-sdk).
+// Theron Agent SDK. Public surface (package name @vextlabs/theron-agent-sdk).
 //
 // The minimum import to build an agent:
 //   import { Agent, Council, Tool, Runner } from "@vextlabs/theron-agent-sdk";
@@ -85,7 +85,7 @@ export type {
 export { MCPClient, collectMcpTools } from "./mcp/index.js";
 export type { McpServerConfig, McpTool } from "./mcp/index.js";
 
-// First-class Theron adapter. There is no hosted default: pass `baseURL`
+// Theron adapter. There is no hosted default: pass `baseURL`
 // or set `THERON_BASE_URL`. Package name stays `@vextlabs/theron-agent-sdk`.
 export { theronAdapter, theron, MissingBaseURLError } from "./adapters/theron.js";
 export type { TheronAdapterOptions } from "./adapters/theron.js";

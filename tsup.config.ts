@@ -5,6 +5,8 @@ import { defineConfig } from "tsup";
 //   - .d.ts emitted for every entry
 //   - Tree-shakeable: each subpath exports independently
 //   - No source maps in the npm tarball (kept under 500 KB)
+// The adapter subpath is emitted by scripts/write-adapter-subpath.mjs after
+// tsup, so it re-exports the root MissingBaseURLError class.
 export default defineConfig({
   entry: {
     index: "src/index.ts",
@@ -19,7 +21,6 @@ export default defineConfig({
     "receipts/index": "src/receipts/index.ts",
     "loop/index": "src/loop/index.ts",
     "patterns/index": "src/patterns/index.ts",
-    "adapters/theron": "src/adapters/theron.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

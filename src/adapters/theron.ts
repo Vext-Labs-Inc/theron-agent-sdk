@@ -1,9 +1,11 @@
 /**
- * Theron ModelAdapter. Bring your own endpoint (any OpenAI-compatible URL).
+ * Theron model adapter.
  *
  * There is no hosted default. Pass `baseURL` (or the existing `base` option),
  * or set `THERON_BASE_URL`. When none of those is set, `chat` throws
  * {@link MissingBaseURLError} before any network call.
+ * An `apiKey` with no `baseURL` is sent to the host in `THERON_BASE_URL`
+ * (or in `base`, when that option is set and `baseURL` is omitted).
  *
  *   import { Agent, Runner, theronAdapter } from "@vextlabs/theron-agent-sdk";
  *
@@ -12,21 +14,12 @@
  *       baseURL: "https://your-endpoint.example",
  *       apiKey: process.env.THERON_API_KEY,
  *     }),
- *     default_model: "theron-council",
  *   });
  *
- * Talks to `<base>/api/v1/chat/completions`, so tool-calling and streaming work
- * the same way they do for the OpenAI/OpenRouter reference adapters.
+ * Requests go to `<baseURL>/api/v1/chat/completions` and include a
+ * `council_mode` field.
  */
 import type { ModelAdapter } from "../runtime/index.js";
-import { resolveJuwelToken } from "./juwel_auth.js";
-
-/**
- * Origins that may receive the implicit account token (`JUWEL_TOKEN` or
- * `~/.juwel/config.json`). Empty on purpose: that token is never attached.
- * An explicit `apiKey` or `tokenProvider` is still sent to the caller base.
- */
-const IMPLICIT_TOKEN_ORIGINS = new Set<string>();
 
 const MISSING_BASE_URL_MESSAGE = "No hosted default endpoint; pass baseURL";
 
@@ -38,36 +31,35 @@ export class MissingBaseURLError extends Error {
   }
 }
 
-function allowsImplicitToken(base: string): boolean {
-  try {
-    return IMPLICIT_TOKEN_ORIGINS.has(new URL(base).origin);
-  } catch {
-    return false;
-  }
-}
-
 function configured(value: string | undefined): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function readTheronBaseUrl(): string | undefined {
+  if (typeof process === "undefined" || !process.env) return undefined;
+  return process.env.THERON_BASE_URL;
+}
+
 /**
  * `baseURL`, then `base`, then `THERON_BASE_URL`.
  * Read at call time so an env var set after construction is visible.
+ * An `apiKey` with no `baseURL` is sent to whichever of those hosts is used.
  */
 function resolveBase(opts: TheronAdapterOptions): string {
   const explicit =
     configured(opts.baseURL) ??
     configured(opts.base) ??
-    configured(process.env.THERON_BASE_URL);
+    configured(readTheronBaseUrl());
   if (!explicit) throw new MissingBaseURLError();
   return explicit.replace(/\/$/, "");
 }
 
 export interface TheronAdapterOptions {
   /**
-   * Endpoint origin. Requests are sent to `<baseURL>/api/v1/chat/completions`.
+   * Endpoint origin. Requests are sent to `<baseURL>/api/v1/chat/completions`
+   * and include a `council_mode` field.
    * Required unless `base` or `THERON_BASE_URL` is set. Wins over both.
    */
   baseURL?: string;
@@ -76,21 +68,24 @@ export interface TheronAdapterOptions {
    * still ahead of `THERON_BASE_URL`.
    */
   base?: string;
-  /** Bearer key. When set, it takes precedence over `tokenProvider`. */
+  /**
+   * Bearer key. When set, it takes precedence over `tokenProvider`.
+   * If `baseURL` is omitted, this key is sent to the host in `base` or
+   * `THERON_BASE_URL`.
+   */
   apiKey?: string;
   /**
    * Async bearer resolver, used only when `apiKey` is absent. When omitted,
-   * no implicit account token is attached: the allow-origin set is empty, so
-   * `JUWEL_TOKEN` and `~/.juwel/config.json` are not sent anywhere. Pass
-   * `apiKey` or `tokenProvider` (for example {@link resolveJuwelToken}) to
-   * authenticate the caller-supplied base. Return undefined for no auth header.
+   * no account token is attached. Pass `apiKey` or `tokenProvider`
+   * (for example {@link resolveJuwelToken}) to authenticate the caller base.
+   * Return undefined for no auth header.
    */
   tokenProvider?: () => Promise<string | undefined>;
   /** Council mode: "fast" (cheaper cascade) or "full" (deep). Default "fast". */
   councilMode?: "fast" | "full";
 }
 
-/** Build a first-class Theron adapter. Alias: `theron`. */
+/** Build a Theron adapter. Alias: `theron`. */
 export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
   const councilMode = opts.councilMode ?? "fast";
 
@@ -99,7 +94,7 @@ export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
     async chat({ model, messages, tools, max_tokens, temperature, onDelta }) {
       const base = resolveBase(opts);
       const url = `${base}/api/v1/chat/completions`;
-      const tokenProvider = opts.tokenProvider ?? (allowsImplicitToken(base) ? resolveJuwelToken : undefined);
+      const tokenProvider = opts.tokenProvider;
 
       const body: Record<string, unknown> = {
         model: model || "theron-council",
@@ -220,8 +215,7 @@ export function theronAdapter(opts: TheronAdapterOptions = {}): ModelAdapter {
 /** Convenience alias matching the docs voice (`theron({...})`). */
 export const theron = theronAdapter;
 
-// Re-export the JUWEL token provider so consumers of the `./adapters/theron`
-// subpath can supply / inspect the default `tokenProvider`.
+// Re-export so callers can pass this function as `tokenProvider`.
 export { resolveJuwelToken } from "./juwel_auth.js";
 
 function safeJson(s: string): unknown {
