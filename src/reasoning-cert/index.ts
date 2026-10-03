@@ -4,9 +4,9 @@
 // attests that a CLAIM in the output is CORRECT, as judged by a SOUND oracle of a
 // DIFFERENT EXECUTION CLASS than the transformer (here: JS re-computation, not a
 // learned grader / LLM-as-judge). The cert goes in `ReceiptInput.metadata`, which
-// the emitter already hashes into `content_hash` and signs (ES256) — so it rides
-// the existing receipt + Merkle chain with no schema bump, and anyone can re-check
-// it OFFLINE with zero trust in the vendor.
+// the emitter hashes into `content_hash` (and signs, when a `ReceiptSigner` is
+// supplied). It travels in the existing receipt with no schema bump, and anyone
+// can re-check it offline.
 //
 // HONEST by construction: every cert carries a mandatory `does_not_certify`, and the
 // verdict ABSTAINs when there is no checkable claim — it never stamps prose as PASS.
