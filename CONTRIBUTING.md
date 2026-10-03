@@ -58,7 +58,7 @@ Issues are triaged weekly by the maintainers. We tag:
 
 ## Security
 
-Found a vulnerability? See [SECURITY.md](SECURITY.md). Do not file a public issue; email `security@tryvext.com`.
+Found a vulnerability? See [SECURITY.md](SECURITY.md). Do not file a public issue; email `juwel@vextlabs.ai` with the subject line `Security`.
 
 ## Code of conduct
 
@@ -72,9 +72,8 @@ Releases are tagged via `git tag v0.X.Y && git push --tags`. Maintainers cut rel
 
 - General questions: open a Discussion on GitHub
 - Bugs: open an Issue
-- Vext managed product / enterprise: `info@tryvext.com`
-- Security: `security@tryvext.com`
+- Security: `juwel@vextlabs.ai`, subject line `Security` (see [SECURITY.md](SECURITY.md))
 
 ---
 
-Maintained by [Vext Labs, Inc.](https://tryvext.com).
+Maintained by [Vext Labs, Inc.](https://vextlabs.ai).

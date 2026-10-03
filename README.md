@@ -257,7 +257,7 @@ This package does not host a model endpoint. Pass `baseURL` (the OpenAI-style AP
 
 ## More from Vext Labs
 
-The SDK is one corner of a larger surface. The full picture lives on the Vext Labs organization page: [github.com/Vext-Labs-Inc](https://github.com/Vext-Labs-Inc). Company site: [tryvext.com](https://tryvext.com).
+The SDK is one corner of a larger surface. The full picture lives on the Vext Labs organization page: [github.com/Vext-Labs-Inc](https://github.com/Vext-Labs-Inc). Company site: [vextlabs.ai](https://vextlabs.ai).
 
 ## Contributing
 
@@ -271,4 +271,4 @@ PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). We're particularly interest
 
 MIT. See [LICENSE](LICENSE).
 
-Built by [Vext Labs, Inc.](https://tryvext.com) (Maryland). Founder: Annalea Layton.
+Built by [Vext Labs, Inc.](https://vextlabs.ai) (Maryland). Founder: Annalea Layton.

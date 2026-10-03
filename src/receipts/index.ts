@@ -39,7 +39,7 @@ export interface Receipt {
   /** Capability the receipt covers. */
   cap: string;
   /** Issuer DID or label. Defaults to "did:web:local". Production users set
-   *  this to their issuer DID (did:web:tryvext.com, did:web:acme.com, ...). */
+   *  this to their issuer DID (did:web:vextlabs.ai, did:web:acme.com, ...). */
   issuer: string;
   /** Actor — who/what produced this. */
   actor?: string;
