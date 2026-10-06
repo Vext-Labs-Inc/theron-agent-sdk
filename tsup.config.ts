@@ -5,11 +5,12 @@ import { defineConfig } from "tsup";
 //   - .d.ts emitted for every entry
 //   - Tree-shakeable: each subpath exports independently
 //   - No source maps in the npm tarball (kept under 500 KB)
-// The adapter subpath is emitted by scripts/write-adapter-subpath.mjs after
-// tsup, so it re-exports the root MissingBaseURLError class.
+// The adapter subpath re-exports the root MissingBaseURLError class in normal
+// and watch builds. Keep its package self-reference external to share exports.
 export default defineConfig({
   entry: {
     index: "src/index.ts",
+    "adapters/theron": "src/adapters/theron-subpath.ts",
     "agent/index": "src/agent/index.ts",
     "council/index": "src/council/index.ts",
     "session/index": "src/session/index.ts",
@@ -22,6 +23,7 @@ export default defineConfig({
     "loop/index": "src/loop/index.ts",
     "patterns/index": "src/patterns/index.ts",
   },
+  external: ["@vextlabs/theron-agent-sdk"],
   format: ["esm", "cjs"],
   dts: true,
   sourcemap: false,

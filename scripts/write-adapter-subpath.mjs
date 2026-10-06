@@ -1,8 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 
-// Runs after tsup. The declaration build removes .d.ts files it did not emit,
-// so this writes the adapter subpath once tsup has exited. The subpath
-// re-exports the root MissingBaseURLError class.
+// Runs after tsup to write stable release wrappers for the adapter subpath.
+// The subpath re-exports the root MissingBaseURLError class.
 const source = await readFile("src/adapters/theron-subpath.ts", "utf8");
 const dts = source.replace(/^\/\*\*[\s\S]*?\*\/\s*/, "");
 const esm = dts.replace(/^export type \{[\s\S]*?;\s*/m, "");
