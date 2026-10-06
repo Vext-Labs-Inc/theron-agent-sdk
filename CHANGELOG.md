@@ -5,10 +5,28 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-03
+
+### Breaking
+- **No hosted default.** `theronAdapter` throws `MissingBaseURLError` (`No hosted default endpoint; pass baseURL`) before any network call when neither `baseURL`, `base`, nor `THERON_BASE_URL` is set. The previous default host is not contacted.
+
 ### Security
-- **Implicit account token stays on the default origin.** `theronAdapter` attaches `JUWEL_TOKEN` or `~/.juwel/config.json` only when the effective `base` origin is the default hosted origin. A custom `base` no longer receives that token. An explicit `apiKey` or `tokenProvider` is still sent.
-- **Adapter fetch does not follow redirects.** `theronAdapter` sets `redirect: "error"`, so a 302 or 307 cannot replay `Authorization` to another origin, including under fetch polyfills that follow by default.
-- **Session shells do not inherit secret env vars.** `LocalCloudSession.exec` copies a small allowlist from `process.env` (`PATH`, `HOME`, `LANG`, `TERM`, and similar locale and temp variables) and then `options.env`. `JUWEL_TOKEN` and names ending in `_TOKEN`, `_KEY`, or `_SECRET` are not copied from the parent environment. Values passed in `options.env` are still set.
+- **Implicit account token is never sent.** `theronAdapter` no longer reads `JUWEL_TOKEN` or `~/.juwel/config.json` on its own, so that token is not attached. An explicit `apiKey` or `tokenProvider` is still sent to the caller-supplied base.
+- **Adapter fetch does not follow redirects.** `theronAdapter` sets `redirect: "error"`, so a 302 or 307 cannot replay `Authorization` to another origin, including under fetch polyfills that follow by default. Cloudflare Workers supports `redirect: "error"` (`follow`, `error`, or `manual`).
+- **Session shells are allowlist-only.** `LocalCloudSession.exec` copies an allowlist from `process.env` (`PATH`, `HOME`, `LANG`, `TERM`, and similar locale and temp variables) and then `options.env`. There is no second deny-list pass. `JUWEL_TOKEN` and names ending in `_TOKEN`, `_KEY`, or `_SECRET` are not inherited. `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, `npm_config_*`, `SSH_AUTH_SOCK`, `NVM_*`, `XDG_*`, and `VIRTUAL_ENV` are not inherited either. Pass any of those through `options.env`.
+
+### Migration
+- Migration: pass baseURL (or set THERON_BASE_URL) and apiKey/tokenProvider; pass resolveJuwelToken as tokenProvider to keep the old token behaviour. `resolveJuwelToken` is exported from the package root and from `./adapters/theron`.
+
+## [0.4.1] - 2026-10-03
+
+### Changed
+- Public source tree synced to the published 0.4.1 package. `package.json` version set to 0.4.1.
+
+## [0.4.0]
+
+### Note
+- This repository has no 0.4.0 commit. History jumps from 0.1.0 to the 0.4.1 source sync.
 
 ## [0.3.2] - 2026-06-27
 
@@ -35,8 +53,8 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.3.0] - 2026-06-13
 
 ### Added
-- **`patterns`** primitives — framework-agnostic, verifier/score-gated reasoning patterns no public agent SDK ships as first-class composables: `selfConsistency` (sample N paths → majority answer + agreement ratio), `bestOfN` (verifier-guided best-of-N), `selfRefine` (draft → critique → revise, early-exit when clean), `treeOfThoughts` (best-first branch/score/expand search), `chainOfVerification` (draft → verify claims independently → revise; hallucination reduction), `mixtureOfAgents` (layered multi-agent propose → refine-seeing-peers → aggregate), `reflexion` (retry with accumulated verbal reflections; learns from outcome feedback, not just output quality). Provider-agnostic (take async `generate`/`score`/`verify`/`critique` fns); pure, deterministic, zero-network. The SDK-side counterparts of Theron's server Hive loops.
-- **`measureLift`** — measure a pattern/loop's score lift + win-rate over a single-shot baseline on a task set. The empirical backbone for proving the harness beats raw single-shot ("the system is the moat") rather than asserting it. Pure; no benchmark framework required.
+- **`patterns`** primitives: framework-agnostic, verifier/score-gated reasoning patterns as composable functions: `selfConsistency` (sample N paths, then majority answer + agreement ratio), `bestOfN` (verifier-guided best-of-N), `selfRefine` (draft, critique, revise, early-exit when clean), `treeOfThoughts` (best-first branch/score/expand search), `chainOfVerification` (draft, verify claims independently, revise), `mixtureOfAgents` (layered multi-agent propose, refine with peer outputs, aggregate), `reflexion` (retry with accumulated verbal reflections from outcome feedback). Provider-agnostic (take async `generate`/`score`/`verify`/`critique` fns); pure, deterministic, zero-network.
+- **`measureLift`**: measure a pattern/loop's score lift + win-rate over a single-shot baseline on a task set, so the effect can be measured rather than asserted. Pure; no benchmark framework required.
 - **`loop`** primitives: `verifiedRatchet` (advance only on a confident verifier pass), verifier-in-the-loop `stopWhen` predicates (`stepCountIs`/`costUsdAtLeast`/`verifierSatisfied`/`anyOf`/`allOf`), `runImprovementCycle`.
 - **Long-horizon primitives** — `compactHistory` (summarize-and-continue: fold older messages into a summary, keep recent verbatim, so a conversation/loop runs far past the context window), `runUntil` (a bounded, checkpointable long-horizon driver: run `step` until a predicate holds or `maxSteps`, with an `onCheckpoint` hook for durable resume), and `boundWorkingSet` (keep a long agent's working memory bounded by importance + recency; pinned items never evicted). Provider-agnostic + pure. The "run soo long, hold soo much context" kit.
 

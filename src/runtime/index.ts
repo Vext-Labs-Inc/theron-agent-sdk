@@ -33,8 +33,8 @@ export type RunnerEvent =
  *
  * Implement once per provider. Three reference adapters ship in
  * `examples/adapters/`: OpenRouter, OpenAI, Anthropic. Production users write
- * their own adapter for their preferred endpoint (Vext-hosted Theron, AWS
- * Bedrock, Cerebras, Groq, your own OSS endpoint).
+ * their own adapter for their preferred endpoint (AWS Bedrock, Cerebras,
+ * Groq, your own OSS endpoint).
  */
 export interface ModelAdapter {
   name: string;

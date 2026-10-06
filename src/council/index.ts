@@ -1,8 +1,5 @@
-// Council — N specialists deliberate, verifier kernels check, reconciler
+// Council: N specialists deliberate, verifier kernels check, reconciler
 // produces the final answer.
-//
-// This is JUWEL Agent SDK's flagship primitive. The architecture nobody
-// else ships as a first-class SDK abstraction.
 
 import type { Agent } from "../agent/index.js";
 import type { Verifier, VerifierResult } from "../verifiers/index.js";
